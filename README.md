@@ -1,2 +1,2 @@
 # xconfig
-xconfig is a xorg automaion to tool to automate X configuaration for GhostBSD
+xconfig is an xorg automation tool for configuring GhostBSD X Window configuration.
