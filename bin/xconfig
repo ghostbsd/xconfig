@@ -81,8 +81,10 @@ start_intel_drm()
 {
   UnloadNvidia
   echo "Starting Desktop (Intel DRM).. Please wait.."
-  # sudo kldload /boot/modules/i915kms.ko
-  # sudo sysrc -f /etc/rc.conf kld_list+="/boot/modules/i915kms.ko"
+  sudo kldload /boot/modules/i915kms.ko
+  sudo sysrc -f /etc/rc.conf kld_list+="/boot/modules/i915kms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
   sudo X -configure
   sudo sed -i "" 's/intel/modesetting/g' /root/xorg.conf.new
   sudo sed -i "" 's/scfb/modesetting/g' /root/xorg.conf.new
@@ -95,8 +97,10 @@ start_legacy_intel()
 {
   UnloadNvidia
   echo "Starting Desktop (Legacy Intel).. Please wait.."
-  # sudo kldload /boot/modules/i915kms.ko
-  # sudo sysrc -f /etc/rc.conf kld_list+="/boot/modules/i915kms.ko"
+  sudo kldload /boot/modules/i915kms.ko
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
   sudo X -configure
   sudo sed -i "" 's/scfb/intel/g' /root/xorg.conf.new
   sudo sed -i "" 's/vesa/intel/g' /root/xorg.conf.new
@@ -108,8 +112,10 @@ start_drm_amdgpu_and_radeonkms()
 {
   UnloadNvidia
   echo "Starting Desktop (amdgpu).. Please wait.."
-  # sudo kldload amdgpu
-  # sudo sysrc -f /etc/rc.conf kld_list+="amdgpu"
+  sudo kldload /boot/modules/amdgpu.ko
+  sudo kldload /boot/modules/radeonkms.ko
+  sudo sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko /boot/modules/radeonkms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
   sudo X -configure
   sudo sed -i "" 's/amdgpu/modesetting/g' /root/xorg.conf.new
   sudo sed -i "" 's/radeon/modesetting/g' /root/xorg.conf.new
@@ -137,12 +143,32 @@ start_drm_radeonkms()
 {
   UnloadNvidia
   echo "Starting Desktop (radeonkms).. Please wait.."
-  # sudo kldload /boot/modules/radeonkms.ko
-  # sudo sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
+  sudo kldload /boot/modules/radeonkms.ko
+  sudo sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
   sudo X -configure
+  sudo sed -i "" 's/amdgpu/modesetting/g' /root/xorg.conf.new
   sudo sed -i "" 's/radeon/modesetting/g' /root/xorg.conf.new
   sudo sed -i "" 's/scfb/modesetting/g' /root/xorg.conf.new
   sudo sed -i "" 's/vesa/modesetting/g' /root/xorg.conf.new
+  sudo cp /root/xorg.conf.new /etc/X11/xorg.conf
+  startx
+}
+
+start_drm_amdgpu()
+{
+  UnloadNvidia
+  echo "Starting Desktop (amdgpu).. Please wait.."
+  sudo kldload /boot/modules/amdgpu.ko
+  sudo sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
+  sudo X -configure
+  sudo sed -i "" 's/radeon/modesetting/g' /root/xorg.conf.new
+  sudo sed -i "" 's/amdgpu/modesetting/g' /root/xorg.conf.new
+  sudo sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new
+  sudo sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new
   sudo cp /root/xorg.conf.new /etc/X11/xorg.conf
   startx
 }
@@ -151,7 +177,14 @@ start_radeonkms()
 {
   UnloadNvidia
   echo "Starting Desktop (radeonkms).. Please wait.."
+  sudo kldunload /boot/modules/amdgpu.ko
+  sudo kldunload /boot/modules/radeonkms.ko
+  sudo kldunload /boot/modules/i915kms.ko
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
   sudo X -configure
+  sudo sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new
   sudo sed -i "" 's/scfb/radeon/g' /root/xorg.conf.new
   sudo sed -i "" 's/vesa/radeon/g' /root/xorg.conf.new
   sudo cp /root/xorg.conf.new /etc/X11/xorg.conf
@@ -162,7 +195,14 @@ start_amdgpu()
 {
   UnloadNvidia
   echo "Starting Desktop (amdgpu).. Please wait.."
+  sudo kldunload /boot/modules/amdgpu.ko
+  sudo kldunload /boot/modules/radeonkms.ko
+  sudo kldunload /boot/modules/i915kms.ko
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+  sudo sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
   sudo X -configure
+  sudo sed -i "" 's/radeon/amdgpu/g' /root/xorg.conf.new
   sudo sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new
   sudo sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new
   sudo cp /root/xorg.conf.new /etc/X11/xorg.conf
@@ -236,7 +276,9 @@ fail_safe()
     --menu "Please select from the following options:" 20 55 15 \
     startx "Start Desktop without Configuration" \
     intel "Start Desktop with Legacy Intel driver" \
-    amdgpu "Start Desktop with AMD GPU DRM driver" \
+    amdgpu "Start Desktop with DRM AMDGPU driver" \
+    amdgpu "Start Desktop with AMDGPU driver" \
+    radeonkmsdrm "Start Desktop with DRM Radeon KMS driver" \
     radeonkms "Start Desktop with Radeon KMS driver" \
     vesa "Start Desktop with VESA driver" \
     scfb "Start Desktop with SCFB driver" \
@@ -249,7 +291,9 @@ fail_safe()
       startx) echo "Starting Desktop.. Please wait.."
         startx ;;
       intel) start_legacy_intel ;;
+      amdgpudrm) start_drm_amdgpu ;;
       amdgpu) start_amdgpu ;;
+      radeonkmsdrm) start_drm_radeonkms ;;
       radeonkms) start_radeonkms ;;
       vesa) echo "Starting Desktop (VESA).. Please wait.."
         sudo cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
@@ -280,7 +324,10 @@ start_xorg()
         cp /usr/local/etc/X11/cardDetect/XF86Config.vmware /etc/X11/xorg.conf
         startx
       else
-        start_drm_modesetting
+        pciconf -lv | grep -B 4 VGA | grep -q Intel
+        if [ $? -eq 0 ] ; then
+          start_intel_drm
+        fi
       fi
     fi
   else
