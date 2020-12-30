@@ -64,7 +64,7 @@ start_nvidia()
   sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   kldload nvidia-modeset
   X -configure
-  sed -i "" 's/nv/nvidia/g' /root/xorg.conf.new
+  sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
   sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
   sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
   cp /root/xorg.conf.new /etc/X11/xorg.conf
