@@ -308,7 +308,7 @@ auto_configure_x()
         else
           pciconf -lv | grep -B 4 VGA | grep -q 'AMD/ATI'
           if [ $? -eq 0 ] ; then
-            start_drm_amdgpu_and_radeonkms
+            start_drm_amdgpu
           else
             fail_safe
           fi
