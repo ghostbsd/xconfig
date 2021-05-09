@@ -55,7 +55,6 @@ start_virtualbox()
   service vboxguest start
   rc-update add vboxservice default
   service vboxservice start
-  startx
 }
 
 start_nvidia()
