@@ -56,7 +56,6 @@ start_virtualbox()
   service vboxguest start
   sysrc vboxservice_enable="YES"
   service vboxservice start
-  startx
 }
 
 install_nvidia()
