@@ -15,7 +15,7 @@ n390drivers="GeForce GTX 480|GeForce GTX 465|GeForce GTX 480M|GeForce GTX 470|Ge
 n340drivers="GeForce 8800 GTX|GeForce 8800 GTS|GeForce 8800 Ultra|Tesla C870|Quadro FX 5600|Quadro FX 4600|GeForce 8600 GTS|GeForce 8600 GT|GeForce 8600 GT|GeForce 8600 GS|GeForce 8400 GS|GeForce 9500M GS|GeForce 8300 GS|GeForce 8600M GT|GeForce 9650M GS|GeForce 8700M GT|Quadro FX 370|Quadro NVS 320M|Quadro FX 570M|Quadro FX 1600M|Quadro FX 570|Quadro FX 1700|GeForce GT 330|GeForce 8400 SE|GeForce 8500 GT|GeForce 8400 GS|GeForce 8300 GS|GeForce 8400 GS|GeForce 8600M GS|GeForce 8400M GT|GeForce 8400M GS|GeForce 8400M G|Quadro NVS 140M|Quadro NVS 130M|Quadro NVS 135M|GeForce 9400 GT|Quadro FX 360M|GeForce 9300M G|Quadro NVS 290|GeForce GTX 295|GeForce GTX 280|GeForce GTX 260|GeForce GTX 285|GeForce GTX 275|Tesla C1060|Tesla T10 Processor|Tesla T10 Processor|Tesla M1060|Tesla M1060|Tesla M1060|GeForce GTX 260|GeForce GTX 295|Quadroplex 2200 D2|Quadroplex 2200 S4|Quadro CX|Quadro FX 5800|Quadro FX 4800|Quadro FX 3800|GeForce 8800 GTS 512|GeForce 9800 GT|GeForce 8800 GT|GeForce GT 230|GeForce 9800 GX2|GeForce 9800 GT|GeForce 8800 GS|GeForce GTS 240|GeForce 9800M GTX|GeForce 8800M GTS|GeForce 8800 GS|GeForce GTX 280M|GeForce 9800M GT|GeForce 8800M GTX|GeForce 8800 GS|GeForce GTX 285M|GeForce 9600 GSO|GeForce 8800 GT|GeForce 9800 GTX/9800 GTX+|GeForce 9800 GTX+|GeForce 9800 GT|GeForce GTS 250|GeForce 9800M GTX|GeForce GTX 260M|Quadro FX 4700 X2|Quadro FX 3700|Quadro VX 200|Quadro FX 3600M|Quadro FX 2800M|Quadro FX 3700M|Quadro FX 3800M|GeForce GT 230|GeForce 9600 GT|GeForce 9600 GS|GeForce 9600 GSO 512|GeForce GT 130|GeForce GT 140|GeForce 9800M GTS|GeForce 9700M GTS|GeForce 9800M GS|GeForce 9800M GTS|GeForce 9600 GT|GeForce 9600 GT|GeForce GT 130|GeForce 9700 S|GeForce GTS 160M|GeForce GTS 150M|GeForce 9600 GSO|GeForce 9600 GT|Quadro FX 1800|Quadro FX 2700M|GeForce 9500 GT|GeForce 9400 GT|GeForce 9500 GT|GeForce 9500 GS|GeForce 9500 GS|GeForce GT 120|GeForce 9600M GT|GeForce 9600M GS|GeForce 9600M GT|GeForce GT 220M|GeForce 9700M GT|GeForce 9500M G|GeForce 9650M GT|GeForce G 110M|GeForce GT 130M|GeForce GT 240M LE|GeForce GT 120M|GeForce GT 220M|GeForce GT 320M|GeForce GT 320M|GeForce GT 120|GeForce GT 120|Quadro FX 380|Quadro FX 580|Quadro FX 1700M|GeForce 9400 GT|Quadro FX 770M|GeForce 9300 GE|GeForce 9300 GS|GeForce 8400|GeForce 8400 SE|GeForce 8400 GS|GeForce 9300M GS|GeForce G100|GeForce 9300 SE|GeForce 9200M GS|GeForce 9200M GE|GeForce 9300M GS|Quadro NVS 150M|Quadro NVS 160M|GeForce G 105M|GeForce G 103M|GeForce G105M|Quadro NVS 420|Quadro FX 370 LP|Quadro FX 370 Low Profile|Quadro NVS 450|Quadro FX 370M|Quadro NVS 295|HICx16 + Graphics|HICx8 + Graphics|GeForce 8200M|GeForce 9100M G|GeForce 8200M G|GeForce 9200|GeForce 9100|GeForce 8300|GeForce 8200|nForce 730a|GeForce 9200|nForce 980a/780a SLI|nForce 750a SLI|GeForce 8100 / nForce 720a|GeForce 9400|GeForce 9400|GeForce 9400M G|GeForce 9400M|GeForce 9300|ION|GeForce 9400M G|GeForce 9400M|GeForce 9400|nForce 760i SLI|GeForce 9400|GeForce 9400|GeForce 9300 / nForce 730i|GeForce 9200|GeForce 9100M G|GeForce 8200M G|GeForce 9400M|GeForce 9200|GeForce G102M|GeForce G205M|GeForce G102M|GeForce G205M|ION|ION|GeForce 9400|ION|ION LE|ION LE|GeForce 320M|GeForce 320M|GeForce 320M|GeForce 320M|GeForce 320M|GeForce GT 220|GeForce 315|GeForce 210|GeForce 405|GeForce 405|GeForce GT 230M|GeForce GT 330M|GeForce GT 230M|GeForce GT 330M|NVS 5100M|GeForce GT 320M|GeForce GT 415|GeForce GT 240M|GeForce GT 325M|Quadro 400|Quadro FX 880M|GeForce G210|GeForce 205|GeForce 310|Second Generation ION|GeForce 210|GeForce 310|GeForce 315|GeForce G105M|GeForce G105M|NVS 2100M|NVS 3100M|GeForce 305M|Second Generation ION|Second Generation ION|GeForce 310M|Second Generation ION|Second Generation ION|GeForce 305M|GeForce 310M|GeForce 305M|Second Generation ION|Second Generation ION|GeForce G210M|GeForce G210|GeForce 310M|Second Generation ION|Second Generation ION|Quadro FX 380 LP|GeForce 315M|GeForce 405|GeForce 405|GeForce 405|GeForce 405|GeForce 405|GeForce 405M|GeForce 405M|GeForce 405|GeForce 405|GeForce 405|Quadro FX 380M|GeForce GT 330|GeForce GT 320|GeForce GT 240|GeForce GT 340|GeForce GT 220|GeForce GT 330|GeForce GTS 260M|GeForce GTS 250M|GeForce GT 220|GeForce GT 335M|GeForce GTS 350M|GeForce GTS 360M|Quadro FX 1800M|GeForce 9300 GS|GeForce 8400GS|GeForce 405|NVS 300"
 n304drivers="GeForce 6800 Ultra|GeForce 6800|GeForce 6800 LE|GeForce 6800 XE|GeForce 6800 XT|GeForce 6800 GT|GeForce 6800 GT|GeForce 6800 GS|GeForce 6800 XT|Quadro FX 4000|GeForce 7800 GTX|GeForce 7800 GTX|GeForce 7800 GT|GeForce 7800 GS|GeForce 7800 SLI|GeForce Go 7800|GeForce Go 7800 GTX|Quadro FX 4500|GeForce 6800 GS|GeForce 6800|GeForce 6800 LE|GeForce 6800 XT|GeForce Go 6800|GeForce Go 6800 Ultra|Quadro FX Go1400|Quadro FX 3450/4000 SDI|Quadro FX 1400|GeForce 6600 GT|GeForce 6600|GeForce 6200|GeForce 6600 LE|GeForce 7800 GS|GeForce 6800 GS|Quadro FX 3400/Quadro FX 4000|GeForce 6800 Ultra|GeForce 6600 GT|GeForce 6600|GeForce 6600 LE|GeForce 6600 VE|GeForce Go 6600|GeForce 6610 XL|GeForce Go 6600 TE/6200 TE|GeForce 6700 XL|GeForce Go 6600|GeForce Go 6600 GT|Quadro NVS 440|Quadro FX 540M|Quadro FX 550|Quadro FX 540|GeForce 6200|GeForce 6500|GeForce 6200 TurboCache(TM)|GeForce 6200SE TurboCache(TM)|GeForce 6200 LE|GeForce Go 6200|Quadro NVS 285|GeForce Go 6400|GeForce Go 6200|GeForce Go 6400|GeForce 6250|GeForce 7100 GS|GeForce 7350 LE|GeForce 7300 LE|GeForce 7550 LE|GeForce 7300 SE/7200 GS|GeForce Go 7200|GeForce Go 7300|GeForce Go 7400|Quadro NVS 110M|Quadro NVS 120M|Quadro FX 350M|GeForce 7500 LE|Quadro FX 350|GeForce 7300 GS|GeForce 6800|GeForce 6800 LE|GeForce 6800 GT|GeForce 6800 XT|GeForce 6200|GeForce 6200 A-LE|GeForce 6150|GeForce 6150 LE|GeForce 6100|GeForce Go 6150|Quadro NVS 210S / GeForce 6150LE|GeForce Go 6100|GeForce 7900 GTX|GeForce 7900 GT/GTO|GeForce 7900 GS|GeForce 7950 GX2|GeForce 7950 GX2|GeForce 7950 GT|GeForce Go 7950 GTX|GeForce Go 7900 GS|Quadro NVS 510M|Quadro FX 2500M|Quadro FX 1500M|Quadro FX 5500|Quadro FX 3500|Quadro FX 1500|Quadro FX 4500 X2|GeForce 7600 GT|GeForce 7600 GS|GeForce 7300 GT|GeForce 7900 GS|GeForce 7950 GT|GeForce 7650 GS|GeForce 7650 GS|GeForce 7600 GT|GeForce 7600 GS|GeForce 7300 GT|GeForce 7600 LE|GeForce 7300 GT|GeForce Go 7700|GeForce Go 7600|GeForce Go 7600 GT|Quadro FX 560M|Quadro FX 560|GeForce 6150SE nForce 430|GeForce 6100 nForce 405|GeForce 6100 nForce 400|GeForce 6100 nForce 420|GeForce 7025 / nForce 630a|GeForce 7150M / nForce 630M|GeForce 7000M / nForce 610M|GeForce 7050 PV / nForce 630a|GeForce 7050 PV / nForce 630a|GeForce 7025 / nForce 630a|GeForce 7150 / nForce 630i|GeForce 7100 / nForce 630i|GeForce 7050 / nForce 630i|GeForce 7050 / nForce 610i|GeForce 7050 / nForce 620i"
 
-pciconf -lv | grep -B 3 VGA | grep -q -E "($n304drivers)"
+radeon_devices="0x4144|0x4145|0x4146|0x4147|0x4E44|0x4E45|0x4E46|0x4E47|0x4148|0x4149|0x414A|0x414B|0x4E48|0x4E49|0x4E4A|0x4E4B|0x4150|0x4151|0x4152|0x4153|0x4154|0x4155|0x4156|0x4E50|0x4E51|0x4E52|0x4E53|0x4E54|0x4E56|0x3150|0x3151|0x3152|0x3154|0x3155|0x3E50|0x3E54|0x5460|0x5462|0x5464|0x5b60|0x5b62|0x5b63|0x5b64|0x5b65|0x5a41|0x5a42|0x5a61|0x5a62|0x5954|0x5955|0x5974|0x5975|0x4A48|0x4A49|0x4A4A|0x4A4B|0x4A4C|0x4A4D|0x4A4E|0x4A4F|0x4A50|0x4A54|0x4B48|0x4B49|0x4B4A|0x4B4B|0x4B4C|0x5548|0x5549|0x554A|0x554B|0x554C|0x554D|0x554E|0x554F|0x5550|0x5551|0x5552|0x5554|0x5d48|0x5d49|0x5d4a|0x5d4c|0x5d4d|0x5d4e|0x5d4f|0x5d50|0x5d52|0x5d57|0x564A|0x564B|0x564F|0x5652|0x5653|0x5657|0x5e48|0x5e4a|0x5e4b|0x5e4c|0x5e4d|0x5e4f|0x793f|0x7941|0x7942|0x791e|0x791f|0x796c|0x796d|0x796e|0x796f|0x7140|0x7141|0x7142|0x7143|0x7144|0x7145|0x7146|0x7147|0x7149|0x714A|0x714B|0x714C|0x714D|0x714E|0x714F|0x7151|0x7152|0x7153|0x715E|0x715F|0x7180|0x7181|0x7183|0x7186|0x7187|0x7188|0x718A|0x718B|0x718C|0x718D|0x718F|0x7193|0x7196|0x719B|0x719F|0x7200|0x7210|0x7211|0x7100|0x7101|0x7102|0x7103|0x7104|0x7105|0x7106|0x7108|0x7109|0x710A|0x710B|0x710C|0x710E|0x710F|0x71C0|0x71C1|0x71C2|0x71C3|0x71C4|0x71C5|0x71C6|0x71C7|0x71CD|0x71CE|0x71D2|0x71D4|0x71D5|0x71D6|0x71DA|0x71DE|0x7281|0x7283|0x7287|0x7290|0x7291|0x7293|0x7297|0x7280|0x7288|0x7289|0x728B|0x728C|0x7240|0x7243|0x7244|0x7245|0x7246|0x7247|0x7248|0x7249|0x724A|0x724B|0x724C|0x724D|0x724E|0x724F|0x7284|0x9400|0x9401|0x9402|0x9403|0x9405|0x940A|0x940B|0x940F|0x94C0|0x94C1|0x94C3|0x94C4|0x94C5|0x94C6|0x94C7|0x94C8|0x94C9|0x94CB|0x94CC|0x94CD|0x9580|0x9581|0x9583|0x9586|0x9587|0x9588|0x9589|0x958A|0x958B|0x958C|0x958D|0x958E|0x958F|0x95C0|0x95C2|0x95C4|0x95C5|0x95C6|0x95C7|0x95C9|0x95CC|0x95CD|0x95CE|0x95CF|0x9590|0x9591|0x9593|0x9595|0x9596|0x9597|0x9598|0x9599|0x959B|0x9500|0x9501|0x9504|0x9505|0x9506|0x9507|0x9508|0x9509|0x950F|0x9511|0x9515|0x9517|0x9519|0x9610|0x9611|0x9612|0x9613|0x9614|0x9615|0x9616|0x9710|0x9711|0x9712|0x9713|0x9714|0x9715|0x9440|0x9441|0x9442|0x9443|0x9444|0x9446|0x944A|0x944B|0x944C|0x944E|0x9450|0x9452|0x9456|0x945A|0x945B|0x945E|0x9460|0x9462|0x946A|0x946B|0x947A|0x947B|0x9480|0x9487|0x9488|0x9489|0x948A|0x948F|0x9490|0x9491|0x9495|0x9498|0x949C|0x949E|0x949F|0x9540|0x9541|0x9542|0x954E|0x954F|0x9552|0x9553|0x9555|0x9557|0x955f|0x94A0|0x94A1|0x94A3|0x94B1|0x94B3|0x94B4|0x94B5|0x94B9|0x68e0|0x68e1|0x68e4|0x68e5|0x68e8|0x68e9|0x68f1|0x68f2|0x68f8|0x68f9|0x68fa|0x68fe|0x68c0|0x68c1|0x68c7|0x68c8|0x68c9|0x68d8|0x68d9|0x68da|0x68de|0x68a0|0x68a1|0x68a8|0x68a9|0x68b0|0x68b8|0x68b9|0x68ba|0x68be|0x68bf|0x6880|0x6888|0x6889|0x688A|0x688C|0x688D|0x6898|0x6899|0x689b|0x689e|0x9802|0x9803|0x9804|0x9805|0x9806|0x9807|0x9808|0x9809|0x980A|0x9640|0x9641|0x9642|0x9643|0x9644|0x9645|0x9647|0x9648|0x9649|0x964a|0x964b|0x964c|0x964e|0x964f|0x9642|0x9643|0x9644|0x9645|0x9649|0x9900|0x9901|0x9903|0x9904|0x9905|0x9906|0x9907|0x9908|0x9909|0x990A|0x990B|0x990C|0x990D|0x990E|0x990F|0x9910|0x9913|0x9917|0x9918|0x9919|0x9990|0x9991|0x9992|0x9993|0x9994|0x9995|0x9996|0x9997|0x9998|0x9999|0x999A|0x999B|0x999C|0x999D|0x99A0|0x99A2|0x99A4|0x6720|0x6721|0x6722|0x6723|0x6724|0x6725|0x6726|0x6727|0x6728|0x6729|0x6738|0x6739|0x673e|0x6740|0x6741|0x6742|0x6743|0x6744|0x6745|0x6746|0x6747|0x6748|0x6749|0x674A|0x6750|0x6751|0x6758|0x6759|0x675B|0x675D|0x675F|0x6840|0x6841|0x6842|0x6843|0x6849|0x6850|0x6858|0x6859|0x6760|0x6761|0x6762|0x6763|0x6764|0x6765|0x6766|0x6767|0x6768|0x6770|0x6771|0x6772|0x6778|0x6779|0x677B|0x515e"
 
 # Check to see if NVidia graphics is primary
 if pciconf -lv | grep -B 3 VGA | grep -q "NVIDIA"; then
@@ -34,20 +34,20 @@ if pciconf -lv | grep -B 3 VGA | grep -q "NVIDIA"; then
   fi
 fi
 
-UnloadNvidia()
+unload_nvidia()
 {
   kldunload nvidia-modeset
   kldunload nvidia
 }
 
-start_virtualbox()
+setup_virtualbox()
 {
-  echo "Starting Desktop with virtualbox settings.. Please wait.."
+  echo "Setting up virtualbox settings.. Please wait.."
   pciconf -lv | grep -B 4 VGA | grep -q NVIDIA
   if pciconf -lv | grep -B 4 VGA | grep -q NVIDIA; then
     echo "Noting to clean for nvidia"
   else
-    UnloadNvidia
+    unload_nvidia
   fi
   sysrc vboxguest_enable="YES"
   service vboxguest start
@@ -77,9 +77,9 @@ install_nvidia()
   fi
 }
 
-start_nvidia()
+setup_nvidia()
 {
-  echo "Starting Desktop (NVIDIA).. Please wait.."
+  echo "Setting up (NVIDIA).. Please wait.."
   sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   kldload nvidia-modeset
   X -configure
@@ -89,17 +89,9 @@ start_nvidia()
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
-UnloadNvidia()
+setup_intel_drm()
 {
-  kldunload nvidia-modeset
-  kldunload nvidia
-
-}
-
-start_intel_drm()
-{
-  UnloadNvidia
-  echo "Starting Desktop (Intel DRM).. Please wait.."
+  echo "Setting up (Intel DRM).. Please wait.."
   kldload /boot/modules/i915kms.ko
   sysrc -f /etc/rc.conf kld_list+="/boot/modules/i915kms.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
@@ -108,38 +100,41 @@ start_intel_drm()
 
 start_legacy_intel()
 {
-  UnloadNvidia
-  echo "Starting Desktop (Legacy Intel).. Please wait.."
+  echo "Setting up (Legacy Intel).. Please wait.."
   kldload /boot/modules/i915kms.ko
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
 }
 
-start_drm_amdgpu_and_radeonkms()
+setup_amdgpu_radeonkms_drm()
 {
-  UnloadNvidia
-  echo "Starting Desktop (amdgpu).. Please wait.."
-  kldload /boot/modules/amdgpu.ko
-  kldload /boot/modules/radeonkms.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko /boot/modules/radeonkms.ko"
+  if pciconf -lv | grep -B 4 VGA | grep -q -E "($radeon_devices)"; then
+    echo "Setting up (radeonkms).. Please wait.."
+    kldload /boot/modules/radeonkms.ko
+    sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
+    sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+  else
+    echo "Setting up (amdgpu).. Please wait.."
+    kldload /boot/modules/amdgpu.ko
+    sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
+    sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+  fi
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
 }
 
-start_drm_radeonkms()
+setup_radeonkms_drm()
 {
-  UnloadNvidia
-  echo "Starting Desktop (radeonkms).. Please wait.."
+  echo "Setting up (radeonkms).. Please wait.."
   kldload /boot/modules/radeonkms.ko
   sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
 }
 
-start_drm_amdgpu()
+setup_amdgpu_drm()
 {
-  UnloadNvidia
-  echo "Starting Desktop (amdgpu).. Please wait.."
+  echo "Setting up (amdgpu).. Please wait.."
   kldload /boot/modules/amdgpu.ko
   sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
@@ -148,8 +143,7 @@ start_drm_amdgpu()
 
 start_radeonkms()
 {
-  UnloadNvidia
-  echo "Starting Desktop (radeonkms).. Please wait.."
+  echo "Setting up (radeonkms).. Please wait.."
   kldunload /boot/modules/amdgpu.ko
   kldunload /boot/modules/radeonkms.ko
   kldunload /boot/modules/i915kms.ko
@@ -165,8 +159,7 @@ start_radeonkms()
 
 start_amdgpu()
 {
-  UnloadNvidia
-  echo "Starting Desktop (amdgpu).. Please wait.."
+  echo "Setting up (amdgpu).. Please wait.."
   kldunload /boot/modules/amdgpu.ko
   kldunload /boot/modules/radeonkms.ko
   kldunload /boot/modules/i915kms.ko
@@ -207,17 +200,17 @@ manual_setup()
 
   ANS="$(cat /tmp/answer)"
   case $ANS in
-    nvidia) start_nvidia ;;
-    drm_intel) start_intel_drm ;;
+    nvidia) setup_nvidia ;;
+    drm_intel) setup_intel_drm ;;
     amdgpu) start_amdgpu ;;
     radeonkms) start_radeonkms ;;
-    vesa) echo "Starting Desktop (VESA).. Please wait.."
+    vesa) echo "Setting up (VESA).. Please wait.."
       cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
       ;;
-    scfb) echo "Starting Desktop (SCFB).. Please wait.."
+    scfb) echo "Setting up (SCFB).. Please wait.."
       cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
       ;;
-    virtualbox) start_virtualbox ;;
+    virtualbox) setup_virtualbox ;;
     shell) start_shell ;;
     reboot) sudo reboot -q ;;
     exit) exit 0 ;;
@@ -240,15 +233,15 @@ fail_safe()
 
   ANS="$(cat /tmp/answer)"
   case $ANS in
-    amdgpudrm) start_drm_amdgpu ;;
-    radeonkmsdrm) start_drm_radeonkms ;;
-    vesa) echo "Starting Desktop (VESA).. Please wait.."
+    amdgpudrm) setup_amdgpu_drm ;;
+    radeonkmsdrm) setup_radeonkms_drm ;;
+    vesa) echo "Setting up (VESA).. Please wait.."
       cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
       ;;
-    scfb) echo "Starting Desktop (SCFB).. Please wait.."
+    scfb) echo "Setting up (SCFB).. Please wait.."
       cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
       ;;
-    virtualbox) start_virtualbox ;;
+    virtualbox) setup_virtualbox ;;
     shell) start_shell ;;
     reboot) sudo reboot -q ;;
     exit) exit 0 ;;
@@ -261,7 +254,7 @@ auto_configure_x()
   if [ -z ${NVDRIVER} ] ; then
     # First check if we are running as a VirtualBox guest
     if pciconf -lv | grep -q "VirtualBox" ; then
-      start_virtualbox
+      setup_virtualbox
     else
       # Check to see if we are running as VMware guest
       pciconf -lv | grep -q "vmware"
@@ -270,12 +263,11 @@ auto_configure_x()
       else
         pciconf -lv | grep -B 4 VGA | grep -q Intel
         if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
-          start_intel_drm
+          setup_intel_drm
         else
           pciconf -lv | grep -B 4 VGA | grep -q 'AMD/ATI'
           if pciconf -lv | grep -B 4 VGA | grep -q 'AMD/ATI' ; then
-            # need to implement menu to let the user chose AMDGPU or Radeon
-            start_drm_amdgpu
+            setup_amdgpu_radeonkms_drm
           else
             fail_safe
           fi
@@ -288,10 +280,10 @@ auto_configure_x()
     # In the future nvidia-hybrid-graphics need to be implemented.
     pciconf -lv | grep -B 4 VGA | grep -q Intel
     if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
-      start_intel_drm
+      setup_intel_drm
     fi
     if [ "${NVDRIVER}" = "470" ] ; then
-      start_nvidia
+      setup_nvidia
     else
       fail_safe
     fi
