@@ -34,20 +34,12 @@ if pciconf -lv | grep -B 3 VGA | grep -q "NVIDIA"; then
   fi
 fi
 
-unload_nvidia()
-{
-  kldunload nvidia-modeset
-  kldunload nvidia
-}
-
 setup_virtualbox()
 {
   echo "Setting up virtualbox settings.. Please wait.."
   pciconf -lv | grep -B 4 VGA | grep -q NVIDIA
   if pciconf -lv | grep -B 4 VGA | grep -q NVIDIA; then
     echo "Noting to clean for nvidia"
-  else
-    unload_nvidia
   fi
   sysrc vboxguest_enable="YES"
   service vboxguest start
