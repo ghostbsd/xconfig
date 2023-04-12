@@ -23,17 +23,17 @@ if pciconf -lv | grep -B 3 VGA | grep -q "NVIDIA"; then
   if pciconf -lv | grep -B 3 VGA | grep -q -E "($n510drivers)"; then
     NVDRIVER="510"
   fi
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n470drivers)" && [ -z ${NVDRIVER} ] ; then
+  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n470drivers)" && [ -z "${NVDRIVER}" ] ; then
     NVDRIVER="470"
   fi
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n390drivers)" && [ -z ${NVDRIVER} ] ; then
+  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n390drivers)" && [ -z "${NVDRIVER}" ] ; then
     NVDRIVER="390"
   fi
 
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n340drivers)" && [ -z ${NVDRIVER} ]; then
+  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n340drivers)" && [ -z "${NVDRIVER}" ]; then
     NVDRIVER="340"
   fi
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n304drivers)" && [ -z ${NVDRIVER} ]; then
+  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n304drivers)" && [ -z "${NVDRIVER}" ]; then
     NVDRIVER="304"
   fi
 fi
@@ -51,28 +51,28 @@ install_and_setup_nvidia()
 {
   echo "Installing and setting up (NVIDIA).. Please wait.."
   if [ "${NVDRIVER}" = "510" ] ; then
-    driver=`cat /xdrivers/drivers-list | grep "nvidia-driver " | cut -d " " -f2`
+    driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver " | cut -d " " -f2)
     pkg add /xdrivers/${driver}
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "470" ] ; then
-    driver=`cat /xdrivers/drivers-list | grep "nvidia-driver-470 " | cut -d " " -f2`
+    driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-470 " | cut -d " " -f2)
     pkg add /xdrivers/${driver}
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "390" ] ; then
-    driver=`cat /xdrivers/drivers-list | grep "nvidia-driver-390 " | cut -d " " -f2`
+    driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-390 " | cut -d " " -f2)
     pkg add /xdrivers/${driver}
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "340" ] ; then
-    driver=`cat /xdrivers/drivers-list | grep "nvidia-driver-340 " | cut -d " " -f2`
+    driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-340 " | cut -d " " -f2)
     pkg add /xdrivers/${driver}
     kldload nvidia
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia nvidia-modeset"
   elif [ "${NVDRIVER}" = "304" ] ; then
-    driver=`cat /xdrivers/drivers-list | grep "nvidia-driver-304 " | cut -d " " -f2`
+    driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-304 " | cut -d " " -f2)
     pkg add /xdrivers/${driver}
     kldload nvidia
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
@@ -81,6 +81,12 @@ install_and_setup_nvidia()
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
   sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
   sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
+  # Add workaround for ABI problem
+  printf '
+Section "ServerFlags"
+    Option "IgnoreABI" "1"
+EndSection
+' >> /root/xorg.conf.new
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -258,7 +264,7 @@ fail_safe()
 
 auto_configure_x()
 {
-  if [ -z ${NVDRIVER} ] ; then
+  if [ -z "${NVDRIVER}" ] ; then
     # First check if we are running as a VirtualBox guest
     if pciconf -lv | grep -q "VirtualBox" ; then
       setup_virtualbox
@@ -290,11 +296,11 @@ auto_configure_x()
     # For now start with Intel DRM driver.
     # In the future nvidia-hybrid-graphics need to be implemented.
     pciconf -lv | grep -B 4 VGA | grep -q Intel
-    if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
-      setup_intel_drm
-    else
-      install_and_setup_nvidia
-    fi
+    # if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
+    #   setup_intel_drm
+    # else
+    install_and_setup_nvidia
+    # fi
   fi
 }
 
