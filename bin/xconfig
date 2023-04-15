@@ -81,6 +81,7 @@ install_and_setup_nvidia()
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
   sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
   sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
+  sed -i "" 's/modesetting/nvidia/g' /root/xorg.conf.new
   # Add workaround for ABI problem
   printf '
 Section "ServerFlags"
