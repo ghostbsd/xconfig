@@ -8,7 +8,7 @@ fi
 TOSTART=$1
 
 NVERSION=$(pkg info -x nvidia-driver | cut -d '-' -f3)
-bootmethod=$(sysctl -n machdep.bootmethod)
+#bootmethod=$(sysctl -n machdep.bootmethod)
 
 
 
@@ -54,36 +54,36 @@ install_and_setup_nvidia()
   echo "Installing and setting up (NVIDIA).. Please wait.."
   if [ "${NVDRIVER}" = "latest" ] ; then
     if [ -d '/xdrivers' ] ; then
-      driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver " | cut -d " " -f2)
-      pkg add /xdrivers/${driver}
+      driver=$(grep "nvidia-driver " /xdrivers/drivers-list | cut -d " " -f2)
+      pkg add "/xdrivers/${driver}"
     fi
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "470" ] ; then
     if [ -d '/xdrivers' ] ; then
-      driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-470 " | cut -d " " -f2)
-      pkg add /xdrivers/${driver}
+      driver=$(grep "nvidia-driver-470 " /xdrivers/drivers-list | cut -d " " -f2)
+      pkg add "/xdrivers/${driver}"
     fi
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "390" ] ; then
     if [ -d '/xdrivers' ] ; then
-      driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-390 " | cut -d " " -f2)
-      pkg add /xdrivers/${driver}
+      driver=$(grep "nvidia-driver-390 " /xdrivers/drivers-list | cut -d " " -f2)
+      pkg add "/xdrivers/${driver}"
     fi
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "340" ] ; then
     if [ -d '/xdrivers' ] ; then
-      driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-340 " | cut -d " " -f2)
-      pkg add /xdrivers/${driver}
+      driver=$(grep "nvidia-driver-340 " /xdrivers/drivers-list | cut -d " " -f2)
+      pkg add "/xdrivers/${driver}"
     fi
     kldload nvidia
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
   elif [ "${NVDRIVER}" = "304" ] ; then
     if [ -d '/xdrivers' ] ; then
-      driver=$(cat /xdrivers/drivers-list | grep "nvidia-driver-304 " | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}
+      driver=$(grep "nvidia-driver-304 " /xdrivers/drivers-list | cut -d " " -f2)
+      pkg add "/xdrivers/${driver}"
     fi
     kldload nvidia
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
