@@ -99,6 +99,7 @@ Section "ServerFlags"
     Option "IgnoreABI" "1"
 EndSection
 ' >> /root/xorg.conf.new
+  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -111,6 +112,7 @@ setup_nvidia()
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
   sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
   sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
+  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -179,6 +181,7 @@ start_radeonkms()
   sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new
   sed -i "" 's/scfb/radeon/g' /root/xorg.conf.new
   sed -i "" 's/vesa/radeon/g' /root/xorg.conf.new
+  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -195,6 +198,7 @@ start_amdgpu()
   sed -i "" 's/radeon/amdgpu/g' /root/xorg.conf.new
   sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new
   sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new
+  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -230,9 +234,11 @@ manual_setup()
     amdgpu) start_amdgpu ;;
     radeonkms) start_radeonkms ;;
     vesa) echo "Setting up (VESA).. Please wait.."
+      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
       ;;
     scfb) echo "Setting up (SCFB).. Please wait.."
+      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
       ;;
     virtualbox) setup_virtualbox ;;
@@ -261,9 +267,11 @@ fail_safe()
     amdgpudrm) setup_amdgpu_drm ;;
     radeonkmsdrm) setup_radeonkms_drm ;;
     vesa) echo "Setting up (VESA).. Please wait.."
+      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
       ;;
     scfb) echo "Setting up (SCFB).. Please wait.."
+      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
       ;;
     virtualbox) setup_virtualbox ;;
@@ -286,6 +294,7 @@ auto_configure_x()
       # Check to see if we are running as VMware guest
       pciconf -lv | grep -q "vmware"
       if pciconf -lv | grep -q "vmware" ; then
+        mkdir -p /etc/X11
         cp /usr/local/etc/X11/cardDetect/XF86Config.vmware /etc/X11/xorg.conf
       else
         pciconf -lv | grep -B 4 VGA | grep -q Intel
