@@ -287,7 +287,7 @@ auto_configure_x()
 {
   if [ -z "${NVDRIVER}" ] ; then
     # First check if we are running as a VirtualBox guest
-    if pciconf -lv | grep -q "VirtualBox" ; then
+    if pciconf -lv | grep -e "VirtualBox" ; then
       setup_virtualbox
     else
       # Uninstall virtualbox-ose-additions since we are not runing on virtualbox
