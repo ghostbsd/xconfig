@@ -89,7 +89,7 @@ install_and_setup_nvidia()
     kldload nvidia
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
   fi
-  X -configure
+  X -configure -ignoreABI
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
   sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
   sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
@@ -109,7 +109,7 @@ setup_nvidia()
   echo "Setting up (NVIDIA).. Please wait.."
   sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   kldload nvidia-modeset
-  X -configure
+  X -configure -ignoreABI
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
   sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
   sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
