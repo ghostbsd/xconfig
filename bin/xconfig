@@ -1,519 +1,805 @@
 #!/bin/sh
-#
-# Complete X Configuration Script for GhostBSD/FreeBSD
-# POSIX sh compatible
-# Prefers Xorg autoconfiguration; only writes xorg.conf when necessary.
-#
 
-set -eu
+# Complete X Configuration Script for GhostBSD/FreeBSD
+# POSIX sh compatible - works with sh, zsh, fish
+# Incorporates all fixes and improvements from testing
+
+set -e
 umask 022
 
-# ---- Configuration ---------------------------------------------------------
+# Configuration
 SCRIPT_NAME="$(basename "$0")"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 LOG_FILE="/var/log/xconfig.log"
+XORG_CONF="/etc/X11/xorg.conf"
+BACKUP_DIR="/etc/X11/backup"
+CONFIG_DIR="$SCRIPT_DIR/cardDetect"
 
-# On FreeBSD the canonical path is /usr/local/etc/X11/xorg.conf.
-XORG_ETC="/usr/local/etc/X11"
-XORG_CONF="${XORG_ETC}/xorg.conf"
-BACKUP_DIR="${XORG_ETC}/backup"
-
-# Xorg binary name on FreeBSD
-XORG_BIN="${XORG_BIN:-Xorg}"
-
-# ---- Logging ---------------------------------------------------------------
+# Logging with structured output
 log() {
-    # level message...
-    lvl="$1"; shift
-    ts=$(date '+%Y-%m-%d %H:%M:%S')
-    # use printf (portable) and ensure log file exists
-    [ -d "$(dirname "$LOG_FILE")" ] || mkdir -p "$(dirname "$LOG_FILE")"
-    printf "[%s] [%s] %s\n" "$ts" "$lvl" "$*" | tee -a "$LOG_FILE"
+    local level="$1"
+    shift
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    printf "[%s] [%s] %s\n" "$timestamp" "$level" "$*" | tee -a "$LOG_FILE"
 }
-info(){ log INFO "$@"; }
-warn(){ log WARN "$@"; }
-error(){ log ERROR "$@"; printf "Error: %s\n" "$*" >&2; }
 
-# ---- Helpers ---------------------------------------------------------------
-need_root() {
-    if [ "$(id -u)" -ne 0 ]; then
-        printf "Error: Must be run as root\n" >&2
+info() { log "INFO" "$@"; }
+warn() { log "WARN" "$@"; }
+error() { log "ERROR" "$@"; echo "Error: $*" >&2; }
+
+# Check root privileges and setup environment
+check_environment() {
+    if [ "$(id -u)" != 0 ]; then
+        echo "Error: Must be run as root" >&2
         exit 1
     fi
+    
+    # Ensure log and backup directories exist
+    mkdir -p "$(dirname "$LOG_FILE")" "$BACKUP_DIR"
+    
+    info "Starting $SCRIPT_NAME (PID: $$)"
+    info "Script directory: $SCRIPT_DIR"
+    info "Config directory: $CONFIG_DIR"
 }
 
+# Apply external configuration file
+apply_external_config() {
+    local config_name="$1"
+    local config_file="$CONFIG_DIR/XF86Config.$config_name"
+    
+    if [ -f "$config_file" ]; then
+        info "Applying external configuration: $config_file"
+        backup_config
+        mkdir -p /etc/X11
+        cp "$config_file" "$XORG_CONF"
+        info "Applied $config_name configuration from external file"
+        return 0
+    else
+        warn "External config file not found: $config_file"
+        return 1
+    fi
+}
+
+# Hardware detection using PCI vendor IDs
+detect_hardware() {
+    local pci_info
+    pci_info=$(pciconf -lv 2>/dev/null) || {
+        error "Cannot read PCI configuration"
+        return 1
+    }
+    
+    # Check virtualization first (highest priority)
+    if echo "$pci_info" | grep -qi "virtualbox"; then
+        echo "virtualbox"
+    elif echo "$pci_info" | grep -qi "vmware\|vendor=0x15ad"; then
+        echo "vmware"
+    elif echo "$pci_info" | grep -qi "qemu\|vendor=0x1234"; then
+        echo "qemu"
+    # Real hardware detection using vendor IDs
+    elif echo "$pci_info" | grep -q "vendor=0x10de"; then
+        detect_nvidia_family "$pci_info"
+    elif echo "$pci_info" | grep -q "vendor=0x8086.*vga"; then
+        echo "intel"
+    elif echo "$pci_info" | grep -q "vendor=0x1002"; then
+        detect_amd_family "$pci_info"
+    else
+        echo "unknown"
+    fi
+}
+
+# NVIDIA family detection using device ID ranges
+detect_nvidia_family() {
+    local pci_info="$1"
+    local device_id
+    
+    device_id=$(echo "$pci_info" | grep -A1 "vendor=0x10de" | grep "device=" | head -1 | cut -d'=' -f2)
+    
+    if [ -z "$device_id" ]; then
+        warn "Cannot determine NVIDIA device ID, using latest driver"
+        echo "nvidia-latest"
+        return
+    fi
+    
+    # Convert hex to decimal for range comparison (simplified approach)
+    local device_hex
+    device_hex=$(echo "$device_id" | sed 's/0x//')
+    
+    info "NVIDIA device ID: $device_id"
+    
+    # Use simplified string comparison for ranges
+    case "$device_hex" in
+        2[8-9]*|[3-9]*)
+            echo "nvidia-latest"  # RTX 50+ series (580 driver)
+            ;;
+        2[6-7]*)
+            echo "nvidia-latest"  # RTX 40 series (580 driver)
+            ;;
+        2[2-5]*)
+            echo "nvidia-latest"  # RTX 30 series (580 driver)
+            ;;
+        1[e-f]*|20*|21*)
+            echo "nvidia-470"     # RTX 20/GTX 16 series
+            ;;
+        1[0-9a-d]*)
+            echo "nvidia-390"     # GTX 10/900 series
+            ;;
+        [6-9]*|a*|b*|c*|d*|e*|f*)
+            echo "nvidia-340"     # GTX 600-800 series
+            ;;
+        *)
+            echo "nvidia-304"     # Legacy cards
+            ;;
+    esac
+}
+
+# AMD family detection
+detect_amd_family() {
+    local pci_info="$1"
+    local device_id
+    
+    device_id=$(echo "$pci_info" | grep -A1 "vendor=0x1002" | grep "device=" | head -1 | cut -d'=' -f2)
+    
+    if [ -z "$device_id" ]; then
+        warn "Cannot determine AMD device ID, using amdgpu"
+        echo "amdgpu"
+        return
+    fi
+    
+    info "AMD device ID: $device_id"
+    
+    # Simplified AMD detection - newer cards use amdgpu
+    case "$device_id" in
+        0x6[9-f]*|0x7*)
+            echo "amdgpu"     # Newer AMD cards
+            ;;
+        *)
+            echo "radeonkms"  # Legacy Radeon cards
+            ;;
+    esac
+}
+
+# Backup existing configuration
 backup_config() {
     if [ -f "$XORG_CONF" ]; then
-        [ -d "$BACKUP_DIR" ] || mkdir -p "$BACKUP_DIR"
-        bname="xorg.conf.$(date +%Y%m%d_%H%M%S)"
-        cp -p "$XORG_CONF" "$BACKUP_DIR/$bname"
-        info "Backed up existing config to $BACKUP_DIR/$bname"
+        local backup_name="xorg.conf.$(date +%Y%m%d_%H%M%S)"
+        cp "$XORG_CONF" "$BACKUP_DIR/$backup_name"
+        info "Backed up existing config to $BACKUP_DIR/$backup_name"
     fi
 }
 
-# Append a kernel module uniquely to rc.conf (kld_list) and load it now.
-ensure_kld_persist_and_loaded() {
-    mod="$1"
-    current="$(sysrc -n kld_list 2>/dev/null || true)"
-    case " $current " in
-        *" $mod "*) : ;;  # already present
-        *) sysrc kld_list="$current $mod" >/dev/null ;;
+# NVIDIA driver setup with real package names
+setup_nvidia() {
+    local driver_type="$1"
+    local pkg_name module_name
+    
+    info "Setting up NVIDIA driver: $driver_type"
+    
+    # Map to actual available package names
+    case "$driver_type" in
+        nvidia-latest) pkg_name="nvidia-driver-580"; module_name="nvidia-modeset" ;;
+        nvidia-470) pkg_name="nvidia-driver-470"; module_name="nvidia-modeset" ;;
+        nvidia-390) pkg_name="nvidia-driver-390"; module_name="nvidia-modeset" ;;
+        nvidia-340) pkg_name="nvidia-driver-340"; module_name="nvidia" ;;
+        nvidia-304) pkg_name="nvidia-driver-304"; module_name="nvidia" ;;
+        nvidia-devel) pkg_name="nvidia-driver-devel"; module_name="nvidia-modeset" ;;
+        *) error "Unknown NVIDIA driver type: $driver_type"; return 1 ;;
     esac
-    if ! kldstat -v | grep -qw "$mod"; then
-        if ! kldload "$mod" 2>/dev/null; then
-            warn "Failed to load module: $mod"
-            return 1
+    
+    # Install driver
+    install_nvidia_driver "$pkg_name" || {
+        error "Failed to install $pkg_name"
+        return 1
+    }
+    
+    # Setup kernel module
+    load_nvidia_module "$module_name" || {
+        error "Failed to load $module_name"
+        return 1
+    }
+    
+    # Generate X configuration
+    generate_nvidia_config || {
+        error "Failed to generate NVIDIA X configuration"
+        return 1
+    }
+    
+    info "NVIDIA setup completed successfully"
+    return 0
+}
+
+# Install NVIDIA driver with proper error handling
+install_nvidia_driver() {
+    local pkg_name="$1"
+    
+    # Check if already installed
+    if pkg info "$pkg_name" >/dev/null 2>&1; then
+        info "NVIDIA driver $pkg_name already installed"
+        return 0
+    fi
+    
+    # Ensure Linux compatibility
+    ensure_linux_compatibility
+    
+    # Try /xdrivers first (GhostBSD specific)
+    if [ -d "/xdrivers" ] && [ -f "/xdrivers/drivers-list" ]; then
+        local driver_file
+        driver_file=$(grep "^$pkg_name " /xdrivers/drivers-list 2>/dev/null | cut -d' ' -f2)
+        if [ -n "$driver_file" ] && [ -f "/xdrivers/$driver_file" ]; then
+            info "Installing $pkg_name from /xdrivers"
+            if pkg add "/xdrivers/$driver_file"; then
+                return 0
+            else
+                warn "Failed to install from /xdrivers, trying repository"
+            fi
         fi
     fi
-    info "Kernel module ensured: $mod"
+    
+    # Install from repository
+    info "Installing $pkg_name from repository"
+    if pkg install -y "$pkg_name"; then
+        info "Successfully installed $pkg_name"
+        return 0
+    fi
+    
+    # Show alternatives if failed
+    error "Failed to install $pkg_name"
+    error "Available NVIDIA drivers:"
+    pkg search "^nvidia-driver-" 2>/dev/null | while read -r line; do
+        error "  $line"
+    done
+    
+    return 1
 }
 
-# Unload possibly conflicting DRM/NVIDIA stacks before switching
-unload_video_modules() {
-    for m in amdgpu radeonkms i915kms nvidia-modeset nvidia; do
-        if kldstat -v | grep -qw "$m"; then
-            kldunload "$m" 2>/dev/null || true
+# Ensure Linux compatibility for NVIDIA
+ensure_linux_compatibility() {
+    # Enable Linux layer
+    if ! sysrc -n linux_enable 2>/dev/null | grep -q "YES"; then
+        info "Enabling Linux compatibility layer"
+        sysrc linux_enable="YES" || warn "Failed to enable Linux compatibility"
+    fi
+    
+    # Load Linux module
+    if ! kldstat | grep -q "linux"; then
+        info "Loading Linux compatibility module"
+        kldload linux 2>/dev/null || kldload linux.ko 2>/dev/null || warn "Failed to load Linux module"
+    fi
+}
+
+# Load NVIDIA kernel module
+load_nvidia_module() {
+    local module_name="$1"
+    
+    info "Loading NVIDIA module: $module_name"
+    
+    # Unload conflicting modules
+    for mod in amdgpu radeonkms i915kms nvidia nvidia-modeset; do
+        if kldstat | grep -q "\\b$mod\\b"; then
+            kldunload "$mod" 2>/dev/null || warn "Failed to unload $mod"
         fi
     done
+    
+    # Load NVIDIA module
+    if kldload "$module_name"; then
+        sysrc kldload_nvidia="$module_name"
+        info "NVIDIA module $module_name loaded successfully"
+        return 0
+    else
+        error "Failed to load NVIDIA module: $module_name"
+        return 1
+    fi
 }
 
-# ---- Hardware Detection ----------------------------------------------------
-detect_hardware() {
-    # Return: one of virtualbox|vmware|qemu|nvidia-*|intel|amdgpu|radeonkms|unknown
-    pci_info="$(pciconf -lv 2>/dev/null || true)"
-
-    # virtual guests first
-    echo "$pci_info" | grep -qi "virtualbox" && { echo "virtualbox"; return; }
-    echo "$pci_info" | grep -Eqi "vmware|vendor=0x15ad" && { echo "vmware"; return; }
-    echo "$pci_info" | grep -Eqi "qemu|vendor=0x1234" && { echo "qemu"; return; }
-
-    # vendors
-    if echo "$pci_info" | grep -q "vendor=0x10de"; then
-        detect_nvidia_family "$pci_info"
-        return
-    fi
-    if echo "$pci_info" | grep -q "vendor=0x8086.*vga"; then
-        echo "intel"; return
-    fi
-    if echo "$pci_info" | grep -q "vendor=0x1002"; then
-        detect_amd_family "$pci_info"
-        return
-    fi
-
-    echo "unknown"
-}
-
-detect_nvidia_family() {
-    pci_info="$1"
-    dev="$(echo "$pci_info" | awk '/vendor=0x10de/{f=1} f && /device=/{print $1; exit}' | cut -d'=' -f2)"
-    if [ -z "${dev:-}" ]; then
-        warn "Cannot determine NVIDIA device ID; using latest driver"
-        echo "nvidia-latest"; return
-    fi
-    devhex="$(echo "$dev" | sed 's/^0x//')"
-    info "NVIDIA device ID: 0x$devhex"
-
-    # Keep coarse buckets, fall back to 'nvidia-driver' if legacy pkgs not present.
-    case "$devhex" in
-        2[8-9]*|[3-9]* ) echo "nvidia-latest" ;; # very new
-        2[6-7]*|2[2-5]* ) echo "nvidia-latest" ;;
-        1[e-f]*|20*|21* ) echo "nvidia-470" ;;
-        1[0-9a-d]*      ) echo "nvidia-390" ;;
-        [6-9a-f]*       ) echo "nvidia-340" ;;
-        *               ) echo "nvidia-legacy" ;;
-    esac
-}
-
-detect_amd_family() {
-    pci_info="$1"
-    dev="$(echo "$pci_info" | awk '/vendor=0x1002/{f=1} f && /device=/{print $1; exit}' | cut -d'=' -f2)"
-    [ -n "${dev:-}" ] && info "AMD device ID: $dev"
-    # Prefer amdgpu for newer, radeonkms otherwise (simple heuristic)
-    case "${dev:-}" in
-        0x6[9a-f]*|0x7*|0x[89a-f]*) echo "amdgpu" ;;
-        *                          ) echo "radeonkms" ;;
-    esac
-}
-
-# ---- Xorg config/test ------------------------------------------------------
-# Generate a one-off config via Xorg -configure (only when needed).
-xorg_configure_into() {
-    out="$1"
-    rm -f /root/xorg.conf.new
-    if "$XORG_BIN" -configure >/tmp/xconfig.log 2>&1; then
+# Generate NVIDIA X configuration
+generate_nvidia_config() {
+    info "Generating NVIDIA X configuration"
+    
+    backup_config
+    
+    if X -configure -ignoreABI >/tmp/nvidia-config.log 2>&1; then
         if [ -f /root/xorg.conf.new ]; then
-            mkdir -p "$XORG_ETC"
-            cp /root/xorg.conf.new "$out"
+            # Modify for NVIDIA
+            sed -i.bak \
+                -e 's/"nv"/"nvidia"/g' \
+                -e 's/"vesa"/"nvidia"/g' \
+                -e 's/"scfb"/"nvidia"/g' \
+                -e 's/"modesetting"/"nvidia"/g' \
+                /root/xorg.conf.new
+            
+            # Add server flags
+            cat >> /root/xorg.conf.new << 'EOF'
+
+Section "ServerFlags"
+    Option "IgnoreABI" "1"
+EndSection
+EOF
+            
+            mkdir -p /etc/X11
+            cp /root/xorg.conf.new "$XORG_CONF"
+            info "NVIDIA X configuration generated successfully"
             return 0
         fi
     fi
+    
+    error "Failed to generate NVIDIA X configuration"
     return 1
 }
 
-# Minimal, race-free smoke test: start Xorg on a dummy vt, kill after N sec.
-test_x_config() {
-    cfg="$1"; secs="${2:-10}"
-    info "Testing X configuration ($cfg) for ~${secs}s"
-    # run Xorg on vt9 to avoid current console; headless test
-    "$XORG_BIN" -config "$cfg" -retro vt9 >/dev/null 2>&1 &
-    xp=$!
-    # Give it a small head start
-    sleep 2
-    if kill -0 "$xp" 2>/dev/null; then
-        # Let it live a bit, then kill
-        ( sleep "$secs"; kill "$xp" 2>/dev/null || true ) &
-        sp=$!
-        wait "$xp" 2>/dev/null || true
-        kill "$sp" 2>/dev/null || true
-        info "X configuration test completed"
+# Intel graphics setup
+setup_intel() {
+    info "Setting up Intel graphics"
+    
+    backup_config
+    
+    # Unload conflicting modules
+    for mod in amdgpu radeonkms nvidia nvidia-modeset; do
+        if kldstat | grep -q "\\b$mod\\b"; then
+            kldunload "$mod" 2>/dev/null || true
+        fi
+    done
+    
+    # Load Intel module
+    if kldload i915kms >/dev/null 2>&1; then
+        sysrc kld_list+="i915kms"
+        info "Intel i915kms module loaded successfully"
+        
+        # Let X auto-detect Intel graphics
+        rm -f "$XORG_CONF"
+        info "Intel graphics setup completed (using auto-detection)"
+        return 0
+    else
+        warn "Failed to load i915kms module, trying auto-detection"
+        rm -f "$XORG_CONF"
         return 0
     fi
-    warn "X failed to stay running during test"
-    return 1
 }
 
-# Safe VESA fallback config
-write_vesa_config() {
-    mkdir -p "$XORG_ETC"
-    cat > "$XORG_CONF" <<'EOF'
+# AMD graphics setup
+setup_amd() {
+    local driver_type="$1"
+    
+    info "Setting up AMD graphics with $driver_type driver"
+    
+    backup_config
+    
+    # Unload conflicting modules
+    for mod in amdgpu radeonkms i915kms nvidia nvidia-modeset; do
+        if kldstat | grep -q "\\b$mod\\b"; then
+            kldunload "$mod" 2>/dev/null || true
+        fi
+    done
+    
+    # Load appropriate AMD module
+    if kldload "$driver_type" >/dev/null 2>&1; then
+        sysrc kld_list+="$driver_type"
+        info "AMD $driver_type module loaded successfully"
+        
+        # Let X auto-detect AMD graphics
+        rm -f "$XORG_CONF"
+        info "AMD graphics setup completed (using auto-detection)"
+        return 0
+    else
+        warn "Failed to load $driver_type module"
+        return 1
+    fi
+}
+
+# VirtualBox guest setup
+setup_virtualbox() {
+    info "Setting up VirtualBox guest graphics"
+    
+    # Enable VirtualBox guest additions
+    sysrc vboxguest_enable="YES" || warn "Failed to enable vboxguest"
+    sysrc vboxservice_enable="YES" || warn "Failed to enable vboxservice"
+    
+    # Start services
+    service vboxguest status >/dev/null 2>&1 || service vboxguest start || warn "Failed to start vboxguest"
+    service vboxservice status >/dev/null 2>&1 || service vboxservice start || warn "Failed to start vboxservice"
+    
+    # Try external config first, fallback to auto-detection
+    if ! apply_external_config "virtualbox"; then
+        backup_config
+        rm -f "$XORG_CONF"
+        info "Using auto-detection for VirtualBox graphics"
+    fi
+    
+    info "VirtualBox graphics setup completed"
+    return 0
+}
+
+# VMware guest setup
+setup_vmware() {
+    info "Setting up VMware guest graphics"
+    
+    if ! apply_external_config "vmware"; then
+        warn "External VMware config not available, using VESA fallback"
+        setup_vesa
+    fi
+    
+    return 0
+}
+
+# QEMU guest setup
+setup_qemu() {
+    info "Setting up QEMU guest graphics"
+    
+    if ! apply_external_config "qemu"; then
+        warn "External QEMU config not available, using VESA fallback"
+        setup_vesa
+    fi
+    
+    return 0
+}
+
+# SCFB (syscons framebuffer) setup
+setup_scfb() {
+    info "Setting up SCFB graphics (FreeBSD syscons framebuffer)"
+    
+    if ! apply_external_config "scfb"; then
+        warn "External SCFB config not available, generating basic config"
+        setup_scfb_config
+    fi
+    
+    return 0
+}
+
+# Generate basic SCFB configuration (fallback)
+setup_scfb_config() {
+    backup_config
+    mkdir -p /etc/X11
+    cat > "$XORG_CONF" << 'EOF'
 Section "Device"
-    Identifier "VideoDevice"
-    Driver "vesa"
+    Identifier "Configured Video Device"
+    Driver "scfb"
+    Option "ShadowFB" "true"
 EndSection
 
 Section "Monitor"
-    Identifier "Monitor0"
+    Identifier "Configured Monitor"
 EndSection
 
 Section "Screen"
-    Identifier "Screen0"
-    Monitor "Monitor0"
-    Device "VideoDevice"
+    Identifier "Default Screen"
+    Monitor "Configured Monitor"
+    Device "Configured Video Device"
     DefaultDepth 24
     SubSection "Display"
         Depth 24
         Modes "1024x768" "800x600" "640x480"
     EndSubSection
 EndSection
-
-Section "ServerFlags"
-    Option "IgnoreABI" "1"
-EndSection
 EOF
-    info "Applied VESA xorg.conf with IgnoreABI"
+    info "Basic SCFB configuration applied"
 }
 
-# ---- Driver setups ---------------------------------------------------------
-setup_nvidia() {
-    family="$1"
-    info "Setting up NVIDIA ($family)"
-    unload_video_modules
-
-    # Map to available pkg names with graceful fallback
-    pkg_try=""
-    case "$family" in
-        nvidia-latest) pkg_try="nvidia-driver nvidia-driver-580 nvidia-driver-550 nvidia-driver-535" ;;
-        nvidia-470)    pkg_try="nvidia-driver-470 nvidia-driver" ;;
-        nvidia-390)    pkg_try="nvidia-driver-390 nvidia-driver-470 nvidia-driver" ;;
-        nvidia-340)    pkg_try="nvidia-driver-340 nvidia-driver-390 nvidia-driver" ;;
-        nvidia-legacy) pkg_try="nvidia-driver nvidia-driver-470" ;;
-        *)             pkg_try="nvidia-driver" ;;
-    esac
-
-    installed=""
-    for p in $pkg_try; do
-        if pkg info "$p" >/dev/null 2>&1 || pkg install -y "$p" >/devnull 2>&1; then
-            installed="$p"; break
-        fi
-        # try repo if not present
-        if pkg install -y "$p"; then
-            installed="$p"; break
-        fi
-    done
-
-    if [ -z "$installed" ]; then
-        error "Failed to install an NVIDIA driver package"
-        pkg search "^nvidia-driver" 2>/dev/null | sed 's/^/  /' >&2 || true
-        return 1
-    fi
-    info "NVIDIA package ready: $installed"
-
-    # Modern drivers use nvidia-modeset; older use nvidia
-    mod="nvidia-modeset"
-    case "$installed" in
-        *340*|*304*) mod="nvidia" ;;
-    esac
-    ensure_kld_persist_and_loaded "$mod" || return 1
-
-    backup_config
-    if xorg_configure_into "$XORG_CONF"; then
-        # ensure nvidia in Device section(s)
-        # BSD sed: use -i '' for in-place
-        sed -i '' -e 's/"nv"/"nvidia"/g; s/"vesa"/"nvidia"/g; s/"scfb"/"nvidia"/g; s/"modesetting"/"nvidia"/g' "$XORG_CONF"
-        # Add ServerFlags IgnoreABI if missing
-        if ! grep -q 'Section "ServerFlags"' "$XORG_CONF" 2>/dev/null; then
-            cat >> "$XORG_CONF" <<'EOF'
-
-Section "ServerFlags"
-    Option "IgnoreABI" "1"
-EndSection
-EOF
-        fi
-        if test_x_config "$XORG_CONF" 8; then
-            info "NVIDIA configuration generated and smoke-tested"
-            return 0
-        fi
-        warn "NVIDIA configuration created but test did not pass"
-        return 0
-    fi
-
-    warn "Xorg -configure failed; falling back to autoconfiguration (no xorg.conf)"
-    rm -f "$XORG_CONF"
-    return 0
-}
-
-setup_intel() {
-    info "Setting up Intel (i915kms)"
-    unload_video_modules
-    if ensure_kld_persist_and_loaded "i915kms"; then
-        backup_config
-        # Prefer autoconfig (generally best for Intel)
-        rm -f "$XORG_CONF" 2>/dev/null || true
-        info "Intel setup complete (autoconfig)"
-        return 0
-    fi
-    warn "Failed to load i915kms; using VESA fallback"
-    backup_config
-    write_vesa_config
-    return 0
-}
-
-setup_amd() {
-    drv="$1"   # amdgpu|radeonkms
-    info "Setting up AMD ($drv)"
-    unload_video_modules
-    if ensure_kld_persist_and_loaded "$drv"; then
-        backup_config
-        # Prefer autoconfig
-        rm -f "$XORG_CONF" 2>/dev/null || true
-        info "AMD setup complete (autoconfig)"
-        return 0
-    fi
-    warn "Failed to load $drv; using VESA fallback"
-    backup_config
-    write_vesa_config
-    return 0
-}
-
-setup_virtualbox() {
-    info "Setting up VirtualBox guest"
-    sysrc vboxguest_enable=YES >/dev/null || true
-    sysrc vboxservice_enable=YES >/dev/null || true
-    service vboxguest onestart >/dev/null 2>&1 || true
-    service vboxservice onestart >/devnull 2>&1 || true
-    backup_config
-    rm -f "$XORG_CONF" 2>/dev/null || true
-    info "VirtualBox setup complete (autoconfig)"
-}
-
-setup_vmware() {
-    info "Setting up VMware guest"
-    backup_config
-    vmcfg="/usr/local/etc/X11/cardDetect/XF86Config.vmware"
-    if [ -f "$vmcfg" ]; then
-        mkdir -p "$XORG_ETC"
-        cp "$vmcfg" "$XORG_CONF"
-        if test_x_config "$XORG_CONF" 8; then
-            info "VMware config applied and tested"
-            return 0
-        fi
-        warn "VMware config test failed; using VESA"
-    fi
-    write_vesa_config
-}
-
+# VESA fallback configuration
 setup_vesa() {
-    info "Setting up VESA (safe mode)"
-    backup_config
-    write_vesa_config
+    info "Setting up VESA graphics (safe mode)"
+    
+    if ! apply_external_config "vesa"; then
+        warn "External VESA config not available, generating basic config"
+        setup_vesa_config
+    fi
+    
     return 0
 }
 
-# ---- System Diagnostics ----------------------------------------------------
-check_system_state() {
-    info "=== System State Check ==="
-    fbsd_version="$(freebsd-version 2>/dev/null || uname -r)"
-    info "FreeBSD version: $fbsd_version"
+# Generate basic VESA configuration (fallback)
+setup_vesa_config() {
+    backup_config
+    mkdir -p /etc/X11
+    cat > "$XORG_CONF" << 'EOF'
+Section "Device"
+    Identifier "Configured Video Device"
+    Driver "vesa"
+EndSection
 
-    info "Available NVIDIA packages (top 10):"
-    pkg search "^nvidia-driver" 2>/dev/null | head -10 | sed 's/^/  /' | while IFS= read -r l; do info "$l"; done
+Section "Monitor"
+    Identifier "Configured Monitor"
+EndSection
 
-    if kldstat -v | grep -qw linux; then info "Linux compat: LOADED"; else info "Linux compat: not loaded"; fi
-
-    info "Detected GPU(s):"
-    pciconf -lv 2>/dev/null | awk '/class=0x030000/{show=1} show && NF {print "  " $0; c++} c==10{exit}' | while IFS= read -r l; do info "$l"; done
-
-    if [ -d "/xdrivers" ]; then
-        cnt=$(ls /xdrivers/*.pkg 2>/dev/null | wc -l | tr -d ' ')
-        info "Custom driver dir: /xdrivers ($cnt packages)"
-    else
-        info "Custom driver dir: not present"
-    fi
-
-    if [ -f "$XORG_CONF" ]; then
-        info "Current xorg.conf: present"
-        grep -E "Driver|Identifier" "$XORG_CONF" 2>/dev/null | sed 's/^/  /' | while IFS= read -r l; do info "$l"; done
-    else
-        info "Current xorg.conf: not present (autoconfig)"
-    fi
-
-    info "Xorg self-test (configure only)"
-    if "$XORG_BIN" -configure >/tmp/x-test.log 2>&1; then
-        info "Xorg -configure: OK"
-        rm -f /root/xorg.conf.new
-    else
-        warn "Xorg -configure: issues detected (see /tmp/x-test.log)"
-        head -5 /tmp/x-test.log 2>/dev/null | sed 's/^/  /' | while IFS= read -r l; do info "$l"; done
-    fi
+Section "Screen"
+    Identifier "Default Screen"
+    Monitor "Configured Monitor"
+    Device "Configured Video Device"
+    DefaultDepth 24
+    SubSection "Display"
+        Depth 24
+        Modes "1024x768" "800x600" "640x480"
+    EndSubSection
+EndSection
+EOF
+    info "Basic VESA configuration applied"
 }
 
-# ---- Auto / Manual ---------------------------------------------------------
+# Progressive auto-configuration
 auto_configure() {
     info "Starting automatic X configuration"
-    hw="$(detect_hardware)"
-    info "Detected hardware: $hw"
-    case "$hw" in
-        virtualbox) setup_virtualbox ;;
-        vmware)     setup_vmware ;;
-        qemu)       setup_vesa ;;                 # qemu/virtio works with vesa/scfb
-        nvidia-*)   setup_nvidia "$hw" ;;
-        intel)      setup_intel ;;
-        amdgpu|radeonkms) setup_amd "$hw" ;;
-        *)          warn "Unknown hardware; using VESA fallback"; setup_vesa ;;
+    
+    local hw_type
+    hw_type=$(detect_hardware)
+    
+    info "Detected hardware: $hw_type"
+    
+    case "$hw_type" in
+        virtualbox)
+            setup_virtualbox
+            ;;
+        vmware)
+            setup_vmware
+            ;;
+        qemu)
+            setup_qemu
+            ;;
+        nvidia-*)
+            setup_nvidia "$hw_type"
+            ;;
+        intel)
+            setup_intel
+            ;;
+        amdgpu|radeonkms)
+            setup_amd "$hw_type"
+            ;;
+        *)
+            warn "Unknown hardware type, using VESA fallback"
+            setup_vesa
+            ;;
     esac
 }
 
+# Interactive manual setup
 manual_setup() {
     info "Starting manual setup"
+    
     if ! command -v dialog >/dev/null 2>&1; then
-        error "dialog(1) not installed; manual mode unavailable"
+        error "Dialog not available for manual setup"
         return 1
     fi
-
-    while :; do
+    
+    while true; do
         dialog --title "X Configuration" \
-          --menu "Select graphics configuration:" 18 70 14 \
-          "auto"          "Automatic detection (recommended)" \
-          "intel"         "Intel graphics (i915kms)" \
-          "amd-auto"      "AMD graphics (auto detect amdgpu/radeonkms)" \
-          "amdgpu"        "AMD amdgpu driver" \
-          "radeonkms"     "AMD radeonkms driver" \
-          "nvidia-latest" "NVIDIA latest driver" \
-          "nvidia-470"    "NVIDIA 470 legacy driver" \
-          "nvidia-390"    "NVIDIA 390 legacy driver" \
-          "nvidia-340"    "NVIDIA 340 legacy driver" \
-          "vesa"          "VESA (safe mode)" \
-          "virtualbox"    "VirtualBox guest" \
-          "vmware"        "VMware guest" \
-          "test"          "Test current configuration" \
-          "exit"          "Exit without changes" 2>/tmp/xconfig_choice || break
-
-        choice="$(cat /tmp/xconfig_choice 2>/dev/null || true)"; rm -f /tmp/xconfig_choice
-
+        --menu "Select graphics configuration:" 20 70 16 \
+        "auto" "Automatic detection (recommended)" \
+        "intel" "Intel graphics" \
+        "amd-auto" "AMD graphics (auto-detect driver)" \
+        "amdgpu" "AMD graphics (amdgpu driver)" \
+        "radeonkms" "AMD graphics (radeonkms driver)" \
+        "nvidia-580" "NVIDIA graphics (580 series driver)" \
+        "nvidia-470" "NVIDIA graphics (470 legacy driver)" \
+        "nvidia-390" "NVIDIA graphics (390 legacy driver)" \
+        "nvidia-340" "NVIDIA graphics (340 legacy driver)" \
+        "nvidia-304" "NVIDIA graphics (304 legacy driver)" \
+        "scfb" "SCFB (FreeBSD syscons framebuffer)" \
+        "vesa" "VESA compatible (safe mode)" \
+        "virtualbox" "VirtualBox guest" \
+        "vmware" "VMware guest" \
+        "qemu" "QEMU guest" \
+        "exit" "Exit without changes" 2>/tmp/xconfig_choice || break
+        
+        local choice
+        choice=$(cat /tmp/xconfig_choice 2>/dev/null)
+        rm -f /tmp/xconfig_choice
+        
         case "$choice" in
             auto)
-                if auto_configure; then dialog --msgbox "Automatic configuration successful." 6 50; break; else dialog --msgbox "Automatic configuration failed." 6 40; fi
-                ;;
-            intel)
-                if setup_intel; then dialog --msgbox "Intel configured successfully." 6 50; break; else dialog --msgbox "Intel configuration failed." 6 40; fi
-                ;;
-            amd-auto)
-                amd_drv="$(detect_amd_family "$(pciconf -lv)")"
-                if setup_amd "$amd_drv"; then dialog --msgbox "AMD configured successfully." 6 50; break; else dialog --msgbox "AMD configuration failed." 6 40; fi
-                ;;
-            amdgpu|radeonkms)
-                if setup_amd "$choice"; then dialog --msgbox "AMD $choice configured successfully." 6 50; break; else dialog --msgbox "AMD $choice failed." 6 40; fi
-                ;;
-            nvidia-*)
-                if setup_nvidia "$choice"; then dialog --msgbox "NVIDIA configured successfully." 6 50; break; else dialog --msgbox "NVIDIA configuration failed." 6 40; fi
-                ;;
-            vesa)
-                if setup_vesa; then dialog --msgbox "VESA configuration successful." 6 40; break; else dialog --msgbox "VESA configuration failed." 6 40; fi
-                ;;
-            virtualbox)
-                if setup_virtualbox; then dialog --msgbox "VirtualBox configuration successful." 6 50; break; else dialog --msgbox "VirtualBox configuration failed." 6 40; fi
-                ;;
-            vmware)
-                if setup_vmware; then dialog --msgbox "VMware configuration successful." 6 50; break; else dialog --msgbox "VMware configuration failed." 6 40; fi
-                ;;
-            test)
-                if [ -f "$XORG_CONF" ]; then
-                    if test_x_config "$XORG_CONF" 8; then dialog --msgbox "Current configuration test passed." 6 50; else dialog --msgbox "Current configuration test failed." 6 50; fi
+                if auto_configure; then
+                    dialog --msgbox "Automatic configuration successful!" 6 50
+                    break
                 else
-                    dialog --msgbox "No xorg.conf present; autoconfig is used at runtime." 6 60
+                    dialog --msgbox "Automatic configuration failed." 6 40
                 fi
                 ;;
-            exit) break ;;
+            intel)
+                if setup_intel; then
+                    dialog --msgbox "Intel graphics configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "Intel configuration failed." 6 40
+                fi
+                ;;
+            amd-auto)
+                local amd_driver
+                amd_driver=$(detect_amd_family "$(pciconf -lv)")
+                if setup_amd "$amd_driver"; then
+                    dialog --msgbox "AMD graphics configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "AMD configuration failed." 6 40
+                fi
+                ;;
+            amdgpu|radeonkms)
+                if setup_amd "$choice"; then
+                    dialog --msgbox "AMD $choice configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "AMD $choice configuration failed." 6 40
+                fi
+                ;;
+            nvidia-*)
+                if setup_nvidia "nvidia-$(echo "$choice" | cut -d'-' -f2)"; then
+                    dialog --msgbox "NVIDIA graphics configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "NVIDIA configuration failed." 6 40
+                fi
+                ;;
+            scfb)
+                if setup_scfb; then
+                    dialog --msgbox "SCFB configuration successful!" 6 40
+                    break
+                else
+                    dialog --msgbox "SCFB configuration failed." 6 40
+                fi
+                ;;
+            vesa)
+                if setup_vesa; then
+                    dialog --msgbox "VESA configuration successful!" 6 40
+                    break
+                else
+                    dialog --msgbox "VESA configuration failed." 6 40
+                fi
+                ;;
+            virtualbox)
+                if setup_virtualbox; then
+                    dialog --msgbox "VirtualBox configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "VirtualBox configuration failed." 6 40
+                fi
+                ;;
+            vmware)
+                if setup_vmware; then
+                    dialog --msgbox "VMware configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "VMware configuration failed." 6 40
+                fi
+                ;;
+            qemu)
+                if setup_qemu; then
+                    dialog --msgbox "QEMU configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "QEMU configuration failed." 6 40
+                fi
+                ;;
+            exit)
+                break
+                ;;
         esac
     done
 }
 
-check_environment() {
-    need_root
-    mkdir -p "$BACKUP_DIR" "$XORG_ETC"
-    info "Starting $SCRIPT_NAME (PID: $$)"
+# System information check
+check_system_state() {
+    info "=== System State Check ==="
+    
+    # FreeBSD version
+    local fbsd_version
+    fbsd_version=$(freebsd-version 2>/dev/null || uname -r)
+    info "FreeBSD version: $fbsd_version"
+    
+    # Configuration directory
+    if [ -d "$CONFIG_DIR" ]; then
+        info "Configuration directory: $CONFIG_DIR"
+        info "Available external configs:"
+        for config in "$CONFIG_DIR"/XF86Config.*; do
+            if [ -f "$config" ]; then
+                info "  $(basename "$config")"
+            fi
+        done
+    else
+        warn "Configuration directory not found: $CONFIG_DIR"
+    fi
+    
+    # Available NVIDIA packages
+    info "Available NVIDIA packages:"
+    pkg search "^nvidia-driver" 2>/dev/null | head -10 | while read -r line; do
+        info "  $line"
+    done
+    
+    # Linux compatibility
+    if kldstat | grep -q "linux"; then
+        info "Linux compatibility: LOADED"
+    else
+        info "Linux compatibility: NOT LOADED"
+    fi
+    
+    # GPU information
+    local gpu_info
+    gpu_info=$(pciconf -lv 2>/dev/null | grep -A2 -B2 "class=0x030000" | head -10)
+    if [ -n "$gpu_info" ]; then
+        info "Detected GPU:"
+        echo "$gpu_info" | while read -r line; do
+            info "  $line"
+        done
+    fi
+    
+    # Driver directories
+    if [ -d "/xdrivers" ]; then
+        local pkg_count
+        pkg_count=$(ls /xdrivers/*.pkg 2>/dev/null | wc -l)
+        info "Custom driver directory: /xdrivers ($pkg_count packages)"
+    else
+        info "Custom driver directory: NOT AVAILABLE"
+    fi
+    
+    # Current X configuration
+    if [ -f "$XORG_CONF" ]; then
+        info "Current X configuration: EXISTS"
+        grep -E "Driver|Identifier" "$XORG_CONF" 2>/dev/null | while read -r line; do
+            info "  $line"
+        done
+    else
+        info "Current X configuration: NOT FOUND (using auto-detection)"
+    fi
 }
 
-check_system_state_wrapper() {
-    check_system_state
-}
-
-usage() {
-    cat >&2 <<EOF
-Usage: $0 [auto|setup|manual|nvidia|intel|amd|vesa|virtualbox|vmware|test|debug]
-  auto        Automatic configuration (default)
-  setup       Interactive manual setup
-  manual      Alias for setup
-  nvidia      NVIDIA graphics (auto-detect family)
-  intel       Intel graphics (i915kms)
-  amd         AMD graphics (auto-detect amdgpu/radeonkms)
-  vesa        VESA safe mode
-  virtualbox  VirtualBox guest
-  vmware      VMware guest
-  test        Test current xorg.conf (if present)
-  debug       Show system diagnostics
-EOF
-}
-
+# Main function
 main() {
-    mode="${1:-auto}"
+    local mode="${1:-auto}"
+    
     check_environment
     info "X configuration mode: $mode"
-
+    
     case "$mode" in
-        auto)         auto_configure ;;
-        setup|manual) manual_setup ;;
-        nvidia)
-            drv="$(detect_nvidia_family "$(pciconf -lv)")"
-            setup_nvidia "$drv"
-            ;;
-        intel)        setup_intel ;;
-        amd)
-            drv="$(detect_amd_family "$(pciconf -lv)")"
-            setup_amd "$drv"
-            ;;
-        vesa)         setup_vesa ;;
-        virtualbox)   setup_virtualbox ;;
-        vmware)       setup_vmware ;;
-        test)
-            if [ -f "$XORG_CONF" ]; then
-                if test_x_config "$XORG_CONF" 8; then info "Current X configuration test passed"; exit 0; else error "Current X configuration test failed"; exit 1; fi
+        auto)
+            if auto_configure; then
+                info "Automatic configuration completed successfully"
             else
-                error "No xorg.conf present to test (autoconfig in use)"; exit 1
+                error "Automatic configuration failed"
+                if command -v dialog >/dev/null 2>&1; then
+                    info "Falling back to manual setup"
+                    manual_setup
+                else
+                    exit 1
+                fi
             fi
             ;;
-        debug|check)  check_system_state_wrapper ;;
-        *)            usage; exit 1 ;;
+        setup|manual)
+            manual_setup
+            ;;
+        nvidia|intel|amd|scfb|vesa|virtualbox|vmware|qemu)
+            case "$mode" in
+                nvidia) 
+                    local nvidia_driver
+                    nvidia_driver=$(detect_nvidia_family "$(pciconf -lv)")
+                    setup_nvidia "$nvidia_driver"
+                    ;;
+                intel) setup_intel ;;
+                amd) 
+                    local amd_driver
+                    amd_driver=$(detect_amd_family "$(pciconf -lv)")
+                    setup_amd "$amd_driver"
+                    ;;
+                scfb) setup_scfb ;;
+                vesa) setup_vesa ;;
+                virtualbox) setup_virtualbox ;;
+                vmware) setup_vmware ;;
+                qemu) setup_qemu ;;
+            esac
+            ;;
+        debug|check)
+            check_system_state
+            ;;
+        *)
+            echo "Usage: $0 [auto|setup|manual|nvidia|intel|amd|scfb|vesa|virtualbox|vmware|qemu|debug]" >&2
+            echo "  auto      - Automatic configuration (default)" >&2
+            echo "  setup     - Interactive manual setup" >&2
+            echo "  manual    - Same as setup" >&2
+            echo "  nvidia    - NVIDIA graphics (auto-detect driver)" >&2
+            echo "  intel     - Intel graphics" >&2
+            echo "  amd       - AMD graphics (auto-detect driver)" >&2
+            echo "  scfb      - SCFB (FreeBSD syscons framebuffer)" >&2
+            echo "  vesa      - VESA compatible (safe mode)" >&2
+            echo "  virtualbox- VirtualBox guest" >&2
+            echo "  vmware    - VMware guest" >&2
+            echo "  qemu      - QEMU guest" >&2
+            echo "  debug     - Show system information" >&2
+            exit 1
+            ;;
     esac
 }
 
+# Execute main function
 main "$@"
