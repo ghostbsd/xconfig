@@ -1,64 +1,86 @@
-# Xorg.conf file generated for GhostBSD
+# VirtualBox guest xorg.conf file for GhostBSD/FreeBSD
 
 Section "ServerLayout"
-    Identifier     "X.org Configured"
+    Identifier     "VirtualBox Configured"
     Screen      0  "Screen0" 0 0
     InputDevice    "Mouse0" "CorePointer"
     InputDevice    "Keyboard0" "CoreKeyboard"
+    Option         "AutoAddDevices" "Off"
+EndSection
+
+Section "Files"
+    ModulePath   "/usr/local/lib/modules"
+    ModulePath   "/usr/local/lib/xorg/modules"
+    FontPath     "/usr/local/share/fonts/misc/"
+    FontPath     "/usr/local/share/fonts/TTF/"
+    FontPath     "/usr/local/share/fonts/Type1/"
+    FontPath     "/usr/local/share/fonts/75dpi/"
+    FontPath     "/usr/local/share/fonts/100dpi/"
+    FontPath     "/usr/local/share/fonts/dejavu/"
+    FontPath     "/usr/local/share/fonts/TrueType/"
 EndSection
 
 Section "Module"
+    Load  "extmod"
+    Load  "record"
+    Load  "dbe"
     Load  "glx"
+    Load  "dri"
+    Load  "dri2"
 EndSection
 
 Section "InputDevice"
     Identifier  "Keyboard0"
     Driver      "kbd"
+    Option      "Protocol" "standard"
+    Option      "XkbRules" "xorg"
+    Option      "XkbModel" "pc105"
+    Option      "XkbLayout" "us"
 EndSection
 
 Section "InputDevice"
     Identifier  "Mouse0"
     Driver      "vboxmouse"
+    Option      "Protocol" "auto"
+    Option      "Device" "/dev/sysmouse"
+    Option      "ZAxisMapping" "4 5 6 7"
 EndSection
 
 Section "Monitor"
     Identifier   "Monitor0"
-    VendorName   "Monitor Vendor"
-    ModelName    "Monitor Model"
+    VendorName   "Oracle Corporation"
+    ModelName    "VirtualBox Virtual Monitor"
+    HorizSync    1.0 - 10000.0
+    VertRefresh  1.0 - 10000.0
+    Option       "DPMS"
 EndSection
 
 Section "Device"
     Identifier  "Card0"
     Driver      "vboxvideo"
     BusID       "PCI:0:2:0"
+    Option      "ShadowFB" "false"
+    Option      "VESA" "false"
 EndSection
 
 Section "Screen"
     Identifier "Screen0"
     Device     "Card0"
     Monitor    "Monitor0"
-    SubSection "Display"
-        Viewport   0 0
-        Depth     1
-    EndSubSection
-    SubSection "Display"
-        Viewport   0 0
-        Depth     4
-    EndSubSection
-    SubSection "Display"
-        Viewport   0 0
-        Depth     8
-    EndSubSection
-    SubSection "Display"
-        Viewport   0 0
-        Depth     15
-    EndSubSection
+    DefaultDepth 24
     SubSection "Display"
         Viewport   0 0
         Depth     16
+        Modes    "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768" "800x600"
     EndSubSection
     SubSection "Display"
         Viewport   0 0
         Depth     24
+        Modes    "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768" "800x600"
+    EndSubSection
+    SubSection "Display"
+        Viewport   0 0
+        Depth     32
+        Modes    "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768" "800x600"
     EndSubSection
 EndSection
