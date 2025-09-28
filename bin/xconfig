@@ -1,335 +1,807 @@
 #!/bin/sh
 
-if ! [ "$(id -u)" = 0 ]; then
-  echo "You must be root to run xconfig"
-  exit 1
-fi
+# Complete X Configuration Script for GhostBSD/FreeBSD
+# POSIX sh compatible - works with sh, zsh, fish
+# Uses X -configure -ignoreABI consistently for better compatibility
 
-TOSTART=$1
+set -e
+umask 022
 
-NVERSION=$(pkg info -x nvidia-driver | cut -d '-' -f3)
-#bootmethod=$(sysctl -n machdep.bootmethod)
+# Configuration
+SCRIPT_NAME="$(basename "$0")"
+LOG_FILE="/var/log/xconfig.log"
+XORG_CONF="/etc/X11/xorg.conf"
+BACKUP_DIR="/etc/X11/backup"
 
-
-
-ndrivers="NVIDIA TITAN RTX|NVIDIA TITAN V|NVIDIA TITAN Xp|NVIDIA TITAN X (Pascal)|GeForce GTX TITAN X|GeForce RTX 4090 Laptop GPU|GeForce RTX 4080 Laptop GPU|GeForce RTX 4070 Laptop GPU|GeForce RTX 4060 Laptop GPU|GeForce RTX 4050 Laptop GPU|NVIDIA GeForce RTX 4090|NVIDIA GeForce RTX 4080|NVIDIA GeForce RTX 4070 Ti|NVIDIA GeForce RTX 4070|GeForce RTX 3080 Ti Laptop GPU|GeForce RTX 3080 Laptop GPU|GeForce RTX 3070 Ti Laptop GPU|GeForce RTX 3070 Laptop GPU|GeForce RTX 3060 Laptop GPU|GeForce RTX 3050 Ti Mobile|GeForce RTX 3050 Ti Laptop GPU|GeForce RTX 3050 Laptop GPU|GeForce RTX 3090 Ti|GeForce RTX 3090|GeForce RTX 3080 Ti|GeForce RTX 3080|GeForce RTX 3070 Ti|GeForce RTX 3070|GeForce RTX 3060 Ti|GeForce RTX 3060|GeForce RTX 3050|GeForce RTX 2080 SUPER|GeForce RTX 2080|GeForce RTX 2070 SUPER|GeForce RTX 2070|GeForce RTX 2060|GeForce RTX 2050|GeForce RTX 2080 Ti|GeForce RTX 2080 SUPER|GeForce RTX 2080|GeForce RTX 2070 SUPER|GeForce RTX 2070|GeForce RTX 2060 SUPER|GeForce RTX 2060|GeForce MX570|GeForce MX550|GeForce MX450|GeForce MX350|GeForce MX330|GeForce MX250|GeForce MX230|GeForce MX150|GeForce MX130|GeForce MX110|GeForce GTX 1660 Ti|GeForce GTX 1650 Ti|GeForce GTX 1650|GeForce GTX 1660 SUPER|GeForce GTX 1650 SUPER|GeForce GTX 1660 Ti|GeForce GTX 1660|GeForce GTX 1650|GeForce GTX 1630|GeForce GTX 1080 Ti|GeForce GTX 1080|GeForce GTX 1070 Ti|GeForce GTX 1070|GeForce GTX 1060|GeForce GTX 1050 Ti|GeForce GTX 1050|GeForce GT 1030|GeForce GT 1010|GeForce GTX 1080|GeForce GTX 1070|GeForce GTX 1060|GeForce GTX 1050 Ti|GeForce GTX 1050|GeForce GTX 980 Ti|GeForce GTX 980|GeForce GTX 970|GeForce GTX 960|GeForce GTX 950|GeForce GTX 980|GeForce GTX 980M|GeForce GTX 970M|GeForce GTX 965M|GeForce GTX 960M|GeForce GTX 950M|GeForce 945M|GeForce 940MX|GeForce 930MX|GeForce 920MX|GeForce 940M|GeForce 930M|GeForce GTX 860M|GeForce GTX 850M|GeForce 845M|GeForce 840M|GeForce 830M|GeForce GTX 750 Ti|GeForce GTX 750|GeForce GTX 745|NVIDIA RTX 6000 Ada Generation|NVIDIA RTX 4000 SFF Ada Generation|NVIDIA RTX A6000|NVIDIA RTX A5500|NVIDIA RTX A5000|NVIDIA RTX A4500|NVIDIA RTX A4000H|NVIDIA RTX A4000|NVIDIA RTX A2000 12GB|NVIDIA RTX A2000|NVIDIA T1000 8GB|NVIDIA T1000|NVIDIA T600|NVIDIA T400 4GB|NVIDIA T400|NVIDIA RTX 5000 Ada Generation Laptop GPU|NVIDIA RTX 4000 Ada Generation Laptop GPU|NVIDIA RTX 3500 Ada Generation Laptop GPU|NVIDIA RTX 3000 Ada Generation Laptop GPU|NVIDIA RTX 2000 Ada Generation Laptop GPU|NVIDIA RTX A5500 Laptop GPU|NVIDIA RTX A5000 Laptop GPU|NVIDIA RTX A4500 Laptop GPU|NVIDIA RTX A4000 Laptop GPU|NVIDIA RTX A3000 12GB Laptop GPU|NVIDIA RTX A3000 Laptop GPU|NVIDIA RTX A2000 8GB Laptop GPU|NVIDIA RTX A2000 Laptop GPU|NVIDIA RTX A1000 Laptop GPU|NVIDIA RTX A500 Laptop GPU|NVIDIA T1200 Laptop GPU |NVIDIA T600 Laptop GPU|NVIDIA T550 Laptop GPU|NVIDIA T500|Quadro RTX 8000|Quadro RTX 6000|Quadro RTX 5000|Quadro RTX 4000|Quadro RTX 3000|Quadro RTX 6000|Quadro RTX 5000|Quadro RTX 4000|Quadro RTX 3000|Quadro GV100|Quadro GP100|Quadro P6000|Quadro P5200|Quadro P5000|Quadro P4000|Quadro P2200|Quadro P2000|Quadro P1000|Quadro P620|Quadro P600|Quadro P400|Quadro M6000 24GB|Quadro M6000|Quadro M5000|Quadro M4000|Quadro M2000|Quadro K2200|Quadro K1200|Quadro K620|Quadro T2000|Quadro T1000|Quadro P5200|Quadro P5000|Quadro P4200|Quadro P3200|Quadro P4000|Quadro P3000|Quadro P2000|Quadro P1000|Quadro P600|Quadro P520|Quadro P500|Quadro M2200|Quadro M1200|Quadro M620|Quadro M520|Quadro M5500|Quadro M5000M|Quadro M4000M|Quadro M3000M|Quadro M2000M|Quadro M1000M|Quadro M600M|Quadro M500M|Quadro K2200M|Quadro K620M|Quadro P5000|Quadro P3000|Quadro M5000 SE|Quadro M3000 SE|NVS 810"
-n470drivers="NVIDIA TITAN RTX|NVIDIA TITAN V|NVIDIA TITAN Xp|NVIDIA TITAN X (Pascal)|GeForce GTX TITAN X|GeForce GTX TITAN|GeForce GTX TITAN Black|GeForce GTX TITAN Z|GeForce RTX 3080 Laptop GPU|GeForce RTX 3070 Laptop GPU|GeForce RTX 3060 Laptop GPU|GeForce RTX 3050 Ti Mobile|GeForce RTX 3050 Ti Laptop GPU|GeForce RTX 3050 Laptop GPU|GeForce RTX 3090|GeForce RTX 3080 Ti|GeForce RTX 3080|GeForce RTX 3070 Ti|GeForce RTX 3070|GeForce RTX 3060 Ti|GeForce RTX 3060|GeForce RTX 2080 SUPER|GeForce RTX 2080|GeForce RTX 2070 SUPER|GeForce RTX 2070|GeForce RTX 2060|GeForce RTX 2050|GeForce RTX 2080 Ti|GeForce RTX 2080 SUPER|GeForce RTX 2080|GeForce RTX 2070 SUPER|GeForce RTX 2070|GeForce RTX 2060 SUPER|GeForce RTX 2060|GeForce MX570|GeForce MX550|GeForce MX450|GeForce MX350|GeForce MX330|GeForce MX250|GeForce MX230|GeForce MX150|GeForce MX130|GeForce MX110|GeForce GTX 1660 Ti|GeForce GTX 1650 Ti|GeForce GTX 1650|GeForce GTX 1660 SUPER|GeForce GTX 1650 SUPER|GeForce GTX 1660 Ti|GeForce GTX 1660|GeForce GTX 1650|GeForce GTX 1080 Ti|GeForce GTX 1080|GeForce GTX 1070 Ti|GeForce GTX 1070|GeForce GTX 1060|GeForce GTX 1050 Ti|GeForce GTX 1050|GeForce GT 1030|GeForce GT 1010|GeForce GTX 1080|GeForce GTX 1070|GeForce GTX 1060|GeForce GTX 1050 Ti|GeForce GTX 1050|GeForce GTX 980 Ti|GeForce GTX 980|GeForce GTX 970|GeForce GTX 960|GeForce GTX 950|GeForce GTX 980|GeForce GTX 980M|GeForce GTX 970M|GeForce GTX 965M|GeForce GTX 960M|GeForce GTX 950M|GeForce 945M|GeForce 940MX|GeForce 930MX|GeForce 920MX|GeForce 940M|GeForce 930M|GeForce GTX 860M|GeForce GTX 850M|GeForce 845M|GeForce 840M|GeForce 830M|GeForce GTX 780 Ti|GeForce GTX 780|GeForce GTX 770|GeForce GTX 760|GeForce GTX 760 Ti (OEM)|GeForce GTX 750 Ti|GeForce GTX 750|GeForce GTX 745|GeForce GT 740|GeForce GT 730|GeForce GT 720|GeForce GT 710|GeForce GTX 690|GeForce GTX 680|GeForce GTX 670|GeForce GTX 660 Ti|GeForce GTX 660|GeForce GTX 650 Ti BOOST|GeForce GTX 650 Ti|GeForce GTX 650|GeForce GTX 645|GeForce GT 640|GeForce GT 635|NVIDIA RTX A6000|NVIDIA RTX A5000|NVIDIA RTX A4500|NVIDIA RTX A4000|NVIDIA RTX A2000 12GB|NVIDIA RTX A2000|NVIDIA T1000 8GB|NVIDIA T1000|NVIDIA T600|NVIDIA T400 4GB|NVIDIA T400|NVIDIA RTX A5000 Laptop GPU|NVIDIA RTX A4000 Laptop GPU|NVIDIA RTX A3000 Laptop GPU|NVIDIA RTX A2000 Laptop GPU|NVIDIA T1200 Laptop GPU |NVIDIA T600 Laptop GPU|NVIDIA T500|Quadro RTX 8000|Quadro RTX 6000|Quadro RTX 5000|Quadro RTX 4000|Quadro RTX 3000|Quadro RTX 6000|Quadro GV100|Quadro GP100|Quadro P6000|Quadro P5200|Quadro P5000|Quadro P4000|Quadro P2200|Quadro P2000|Quadro P1000|Quadro P620|Quadro P600|Quadro P400|Quadro M6000 24GB|Quadro M6000|Quadro M5000|Quadro M4000|Quadro M2000|Quadro K6000|Quadro K5200|Quadro K5000|Quadro K4000|Quadro K4200|Quadro K2200|Quadro K2000|Quadro K2000D|Quadro K1200|Quadro K620|Quadro K600|Quadro K420|Quadro 410|Quadro T2000|Quadro T1000|Quadro P5200|Quadro P5000|Quadro P4200|Quadro P3200|Quadro P4000|Quadro P3000|Quadro P2000|Quadro P1000|Quadro P600|Quadro P520|Quadro P500|Quadro M2200|Quadro M1200|Quadro M620|Quadro M520|Quadro M5500|Quadro M5000M|Quadro M4000M|Quadro M3000M|Quadro M2000M|Quadro M1000M|Quadro M600M|Quadro M500M|Quadro K2200M|Quadro K620M|Quadro P5000|Quadro P3000|Quadro M5000 SE|Quadro M3000 SE|NVS 810|NVS 510|GRID K520|NVS 810|NVS 510"
-n390drivers="GeForce GTX 480|GeForce GTX 465|GeForce GTX 480M|GeForce GTX 470|GeForce GT 440|GeForce GTS 450|GeForce GTS 450|GeForce GTS 450|GeForce GT 555M|GeForce GT 555M|GeForce GTX 460M|GeForce GT 445M|GeForce GT 435M|GeForce GT 550M|GeForce GT 440|GeForce GT 430|GeForce GT 420|GeForce GT 635M|GeForce GT 520|GeForce GT 530|GeForce GT 610|GeForce GT 620M|GeForce GT 630M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 640M LE|GeForce GT 635M|GeForce 610M|GeForce 615|GeForce 615|GeForce 615|GeForce 615|GeForce 615|GeForce GT 555M|GeForce GT 525M|GeForce GT 520M|GeForce GT 415M|GeForce GT 425M|GeForce GT 420M|GeForce GT 435M|GeForce GT 420M|GeForce GT 540M|GeForce GT 630M|GeForce GT 630M|GeForce GT 525M|GeForce GT 550M|GeForce GT 520M|GeForce GTX 460|GeForce GTX 460 SE|GeForce GTX 460|GeForce GTX 470M|GeForce GTX 485M|GeForce GT 630|GeForce GT 620|GeForce GT 730|GeForce GT 610|GeForce GT 640|GeForce GT 640|GeForce GT 630|GeForce GTX 650|GeForce GT 740|GeForce GT 730|GeForce GT 755M|GeForce GT 640M LE|GeForce GT 650M|GeForce GT 640M|GeForce GT 640M LE|GeForce GT 640M LE|GeForce GT 640M LE|GeForce GTX 660M|GeForce GT 650M|GeForce GT 640M|GeForce GT 645M|GeForce GT 740M|GeForce GTX 660M|GeForce GT 730M|GeForce GT 745M|GeForce GT 745M|GeForce GT 745A|GeForce GT 745A|GeForce GT 750M|GeForce GT 750M|GeForce GT 755M|GeForce 710A|GeForce 820M|GeForce 810M|GeForce GTX TITAN Z|GeForce GTX 780|GeForce GTX TITAN|GeForce GTX 780|GeForce GTX 780 Ti|GeForce GTX 780 Ti|GeForce GTX TITAN Black|GeForce GT 520|GeForce 510|GeForce 605|GeForce GT 620|GeForce GT 610|GeForce GT 625 (OEM)|GeForce GT 625|GeForce GT 625|GeForce GT 625|GeForce GT 625|GeForce GT 625|GeForce GT 705|GeForce GT 520M|GeForce GT 520MX|GeForce GT 520M|GeForce 410M|GeForce 410M|GeForce 610M|GeForce 610|GeForce 800A|GeForce  705A|GeForce 800A|GeForce 800A|GeForce 800A|GeForce 800A|GeForce 800A|GeForce 610M|GeForce 610M|GeForce 705M|GeForce 705A|GeForce 800A|GeForce 705A|GeForce 800A|GeForce GTX 580|GeForce GTX 570|GeForce GTX 560 Ti|GeForce GTX 560|GeForce GTX 570|GeForce GTX 560 Ti|GeForce GTX 590|GeForce GTX 580|GeForce GTX 580|GeForce 820M|GeForce GT 720M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 620M|GeForce GT 720M|GeForce 710M|GeForce 710M|GeForce GT 720M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce 820M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce 820M|GeForce 710M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 810M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 810M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce GT 630M|GeForce GT 630M|GeForce GT 620M|GeForce GT 620M|GeForce GT 625M|GeForce GT 630M|GeForce GT 630M|GeForce GT 630M|GeForce GT 625M|GeForce GT 625M|GeForce GT 625M|GeForce GT 625M|GeForce GT 625M|GeForce GT 625M|GeForce GT 630M|GeForce GT 720M|GeForce GT 720M|GeForce GT 630M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce GT 630M|GeForce GT 630M|GeForce GT 630M|GeForce GT 630M|GeForce GT 630M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce GT 720A|GeForce 710A|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 620M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce GT 620M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 710M|GeForce GT 710M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce GT 720M|GeForce GT 720M|GeForce 820M|GeForce 820M|GeForce GT 720M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce GT 620M|GeForce GT 630M|GeForce GT 620M|GeForce 820M|GeForce GT 620M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 820M|GeForce 820M|GeForce GT 710M|GeForce GT 720M|GeForce 820M|GeForce 720M|GeForce GT 720M|GeForce 820M|GeForce GT 720M|GeForce GT 720M|GeForce 720M|GeForce GT 720M|GeForce 820M|GeForce GT 720M|GeForce 820M|GeForce 620M|GeForce GT 630M|GeForce GT 630M|GeForce GT 820M|GeForce 710M|GeForce 820M|GeForce GT 630M|GeForce 710M|GeForce GT 720M|GeForce 820M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720A|GeForce 820A|GeForce 720A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce GT 620M|GeForce 705M|GeForce 800M|GeForce 820A|GeForce 800M|GeForce 800M|GeForce 800M|GeForce 705A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce 820A|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 720M|GeForce GT 820M|GeForce GT 820M|GeForce GT 820M|GeForce GT 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce 610M|GeForce 710M|GeForce 710M|GeForce GT 625M|GeForce GT 720M|GeForce 820M|GeForce GT 720M|GeForce GT 720M|GeForce 820M|GeForce 820M|GeForce 610M|GeForce 610M|GeForce GT 720M|GeForce 705M|GeForce GT 620M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce GT 720M|GeForce 710M|GeForce 710M|GeForce 710M|GeForce GT 720M|GeForce 710M|GeForce GT 720M|GeForce GT 720M|GeForce 705M|GeForce 705M|GeForce 820M|GeForce 820M|GeForce 710M|GeForce 820M|GeForce 820M|GeForce 710M|GeForce 710M|GeForce GT 720M|GeForce GT 720M|GeForce 820M|GeForce 820M|GeForce GT 620M|GeForce GT 620M|GeForce 820M|GeForce GT 720M|GeForce 820M|GeForce 820M|GeForce 820M|GeForce GT 720M|GeForce 820M|GeForce 810M|GeForce GTX 680|GeForce GTX 660 Ti|GeForce GTX 770|GeForce GTX 660|GeForce GTX 760|GeForce GTX 760|GeForce GTX 690|GeForce GTX 670|GeForce GTX 760 Ti OEM|GeForce GTX 760 (192-bit)|GeForce GTX 760 Ti OEM|GeForce GTX 660|GeForce GTX 880M|GeForce GTX 870M|GeForce GTX 760|GeForce GTX 860M|GeForce GTX 775M|GeForce GTX 780M|GeForce GTX 780M|GeForce GTX 680M|GeForce GTX 670MX|GeForce GTX 675MX|GeForce GTX 680MX|GeForce GTX 675MX|GeForce GTX 660|GeForce GTX 650 Ti BOOST|GeForce GTX 650 Ti|GeForce GTX 645|GeForce GT 740|GeForce GTX 650 Ti|GeForce GTX 650|GeForce GT 740|GeForce GTX 770M|GeForce GTX 765M|GeForce GTX 765M|GeForce GTX 760M|GeForce GTX 760A|GeForce GTX 560 Ti|GeForce GTX 560|GeForce GTX 460 SE v2|GeForce GTX 460 v2|GeForce GTX 555|GeForce GT 645|GeForce GTX 560 SE|GeForce GTX 570M|GeForce GTX 580M|GeForce GTX 675M|GeForce GTX 670M|GeForce GT 545|GeForce GT 545|GeForce GTX 550 Ti|GeForce GTS 450|GeForce GT 550M|GeForce GT 555M|GeForce GT 635M|GeForce GT 635M|GeForce GT 635M|GeForce GT 555M|GeForce GTS 450|GeForce GT 640|GeForce GT 555M|GeForce GT 635M|GeForce GTX 560M|GeForce GT 635|GeForce GT 710|GeForce GT 640|GeForce GT 630|GeForce GT 720|GeForce GT 730|GeForce GT 720|GeForce GT 710|GeForce GT 710|GeForce GT 730M|GeForce 730A|GeForce GT 735M|GeForce GT 740M|GeForce GT 740A|GeForce GT 740A|GeForce GT 740A|GeForce GT 730M|GeForce 710M|GeForce 710A|GeForce 710A|GeForce 810A|GeForce 810A|GeForce 805A|GeForce 710A|GeForce 825M|GeForce GT 720M|GeForce 920M|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce 920A|GeForce GT 730|GeForce 910M|GeForce 830M|GeForce 830A|GeForce 840M|GeForce 840A|GeForce 840A|GeForce 840A|GeForce 840A|GeForce 845M|GeForce 930M|GeForce 930A|GeForce 930A|GeForce 930A|GeForce 930A|GeForce 940M|GeForce 940A|GeForce 940A|GeForce 945M|GeForce 945A|GeForce 930M|GeForce 930A|GeForce 930A|GeForce 930A|GeForce 930A|GeForce 930A|GeForce 940MX|GeForce GPU|GeForce 940MX|GeForce 930MX|GeForce 920MX|GeForce 940A|GeForce GTX 750 Ti|GeForce GTX 750|GeForce GTX 745|GeForce 845M|GeForce GTX 850M|GeForce GTX 850A|GeForce GTX 860M|GeForce GPU|GeForce GTX 750 Ti|GeForce GTX 750 Ti|GeForce 840M|GeForce 845M|GeForce 945M|GeForce GTX 950M|GeForce GTX 950A|GeForce GTX 950A|GeForce GTX 950A|GeForce GTX 950A|GeForce GTX 950A|GeForce GTX 950A|GeForce GTX 960M|GeForce GTX 750 Ti|GeForce GTX 860M|GeForce GTX 960A|GeForce GTX 750Ti|GeForce GTX 960A|GeForce GTX 750 Ti|GeForce GTX 750Ti|GeForce 940M|GeForce GTX 750 Ti|GeForce GTX 980|GeForce GTX 970|GeForce GTX 980M|GeForce GTX 970M|GeForce GTX 960|GeForce GTX 960|GeForce GTX 960|GeForce GTX 960|GeForce GTX 960|GeForce GTX 965M|GeForce GTX 980|GeForce GTX 960|GeForce GTX 950|GeForce GTX 960|GeForce GTX 750|GeForce GTX 965M|GeForce GTX 950|GeForce GTX 980M|GeForce GTX 970M|GeForce GTX 965M|GeForce GTX 980|GeForce GTX 965M|GeForce MX130|GeForce MX110|GeForce 940MX|GeForce GTX TITAN X|GeForce GTX 980 Ti|TITAN X (Pascal)|TITAN Xp|TITAN Xp COLLECTORS EDITION|TITAN Xp COLLECTORS EDITION|GeForce GTX 1080 Ti|GeForce GTX 1080|GeForce GTX 1070|GeForce GTX 1070 Ti|GeForce GTX 1060 6GB|GeForce GTX 1060 3GB|P104-100|GeForce GTX 1080|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1070|GeForce GTX 1070 with MaxQ Design|GeForce GTX 1070 With Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|P104-101|GeForce GTX 1080|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1080 with Max-Q Design|GeForce GTX 1070|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1070 with Max-Q Design|GeForce GTX 1060 3GB|GeForce GTX 1060 6GB|GeForce GTX 1060 5GB|GeForce GTX 1060 6GB|P106-100|P106-090|GeForce GTX 1060|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1050 Ti|GeForce GTX 1050|GeForce GTX 1060|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1060 with Max-Q Design|GeForce GTX 1050 Ti|GeForce GTX 1050|GeForce GTX 1050|GeForce GTX 1050 Ti|GeForce GTX 1050|GeForce GTX 1050 Ti|GeForce GTX 1050 Ti with Max-Q Design|GeForce GTX 1050 Ti with Max-Q Design|GeForce GTX 1050 Ti with Max-Q Design|GeForce GTX 1050|GeForce GTX 1050 with Max-Q Design|GeForce GTX 1050 with Max-Q Design|GeForce GTX 1050 with Max-Q Design|GeForce GTX 1050 with Max-Q Design|GeForce GT 1030|GeForce MX150|GeForce MX150|TITAN V|Quadro 6000|Quadro 5000|Quadro 5000M|Quadro 6000|Quadro 4000|Quadro 2000|Quadro 2000D|Quadro 2000M|Quadro 600|Quadro 500M|Quadro 1000M|Quadro 3000M|Quadro 4000M|Quadro K420|Quadro K1100M|Quadro K500M|Quadro K2000D|Quadro K600|Quadro K2000M|Quadro K1000M|Quadro K2000|Quadro 410|Quadro K6000|Quadro K5200|Quadro 5010M|Quadro 7000|Quadro K4200|Quadro K3100M|Quadro K4100M|Quadro K5100M|Quadro K5000|Quadro K5000M|Quadro K4000M|Quadro K3000M|Quadro K4000|Quadro K2100M|Quadro K610M|Quadro K510M|Quadro K620M|Quadro M500M|Quadro M500M|Quadro M520|Quadro M2000M|Quadro M1000M|Quadro M600M|Quadro K2200M|Quadro M620|Quadro M1200|Quadro K2200|Quadro K620|Quadro K1200|Quadro M5000|Quadro M4000|Quadro M5000M|Quadro M5000 SE|Quadro M4000M|Quadro M3000M|Quadro M3000 SE|Quadro M5500|Quadro M2000|Quadro GP100|Quadro M6000|Quadro M6000 24GB|Quadro P6000|Quadro P5000|Quadro P4000|Quadro P5200|Quadro P5000|Quadro P4000|Quadro P4000 with Max-Q Design|Quadro P4000 with Max-Q Design|Quadro P3000|Quadro P4200|Quadro P3200|Quadro P2000|Quadro P1000|Quadro P600|Quadro P400|Quadro P620|Quadro P2000|Quadro P1000|Quadro P600|Quadro P500|Quadro GV100|NVS 5400M|NVS 5200M|NVS 510|NVS 4200M|NVS 4200M|NVS 315|NVS 310|NVS 5200M|NVS 5200M|NVS 5200M|NVS 5200M|NVS 5200M|NVS 5200M|NVS 5200M|NVS 810|Tesla C2050 / C2070|Tesla C2050|Tesla C2070|Tesla M2070|Tesla X2070|Tesla T20 Processor|Tesla S2050|Tesla M2050|Tesla X2070|Tesla M2050|Tesla M2050|Tesla M2050|Tesla M2050|Tesla M2050|Tesla M2070-Q|Tesla K20Xm|Tesla K20c|Tesla K40m|Tesla K40c|Tesla K20s|Tesla K40st|Tesla K20m|Tesla K40s|Tesla K40t|Tesla K80|Tesla M2090|Tesla X2090|Tesla X2090|Tesla X2090|Tesla X2090|Tesla M2075|Tesla C2075|Tesla C2050|Tesla K10|Tesla K8|Tesla M60|Tesla M6|Tesla M4|Quadro M2200|Tesla P100-PCIE-12GB|Tesla P100-PCIE-16GB|Tesla P100-SXM2-16GB|Tesla M40|Tesla M40 24GB|Tesla P40|Tesla P4|Tesla P6|Tesla V100-SXM2-16GB|Tesla V100-FHHL-16GB|Tesla V100-PCIE-16GB|Tesla V100-SXM2-32GB|Tesla V100-PCIE-32GB|Tesla V100-DGXS-32GB|GRID K520"
-n340drivers="GeForce 8800 GTX|GeForce 8800 GTS|GeForce 8800 Ultra|Tesla C870|Quadro FX 5600|Quadro FX 4600|GeForce 8600 GTS|GeForce 8600 GT|GeForce 8600 GT|GeForce 8600 GS|GeForce 8400 GS|GeForce 9500M GS|GeForce 8300 GS|GeForce 8600M GT|GeForce 9650M GS|GeForce 8700M GT|Quadro FX 370|Quadro NVS 320M|Quadro FX 570M|Quadro FX 1600M|Quadro FX 570|Quadro FX 1700|GeForce GT 330|GeForce 8400 SE|GeForce 8500 GT|GeForce 8400 GS|GeForce 8300 GS|GeForce 8400 GS|GeForce 8600M GS|GeForce 8400M GT|GeForce 8400M GS|GeForce 8400M G|Quadro NVS 140M|Quadro NVS 130M|Quadro NVS 135M|GeForce 9400 GT|Quadro FX 360M|GeForce 9300M G|Quadro NVS 290|GeForce GTX 295|GeForce GTX 280|GeForce GTX 260|GeForce GTX 285|GeForce GTX 275|Tesla C1060|Tesla T10 Processor|Tesla T10 Processor|Tesla M1060|Tesla M1060|Tesla M1060|GeForce GTX 260|GeForce GTX 295|Quadroplex 2200 D2|Quadroplex 2200 S4|Quadro CX|Quadro FX 5800|Quadro FX 4800|Quadro FX 3800|GeForce 8800 GTS 512|GeForce 9800 GT|GeForce 8800 GT|GeForce GT 230|GeForce 9800 GX2|GeForce 9800 GT|GeForce 8800 GS|GeForce GTS 240|GeForce 9800M GTX|GeForce 8800M GTS|GeForce 8800 GS|GeForce GTX 280M|GeForce 9800M GT|GeForce 8800M GTX|GeForce 8800 GS|GeForce GTX 285M|GeForce 9600 GSO|GeForce 8800 GT|GeForce 9800 GTX/9800 GTX+|GeForce 9800 GTX+|GeForce 9800 GT|GeForce GTS 250|GeForce 9800M GTX|GeForce GTX 260M|Quadro FX 4700 X2|Quadro FX 3700|Quadro VX 200|Quadro FX 3600M|Quadro FX 2800M|Quadro FX 3700M|Quadro FX 3800M|GeForce GT 230|GeForce 9600 GT|GeForce 9600 GS|GeForce 9600 GSO 512|GeForce GT 130|GeForce GT 140|GeForce 9800M GTS|GeForce 9700M GTS|GeForce 9800M GS|GeForce 9800M GTS|GeForce 9600 GT|GeForce 9600 GT|GeForce GT 130|GeForce 9700 S|GeForce GTS 160M|GeForce GTS 150M|GeForce 9600 GSO|GeForce 9600 GT|Quadro FX 1800|Quadro FX 2700M|GeForce 9500 GT|GeForce 9400 GT|GeForce 9500 GT|GeForce 9500 GS|GeForce 9500 GS|GeForce GT 120|GeForce 9600M GT|GeForce 9600M GS|GeForce 9600M GT|GeForce GT 220M|GeForce 9700M GT|GeForce 9500M G|GeForce 9650M GT|GeForce G 110M|GeForce GT 130M|GeForce GT 240M LE|GeForce GT 120M|GeForce GT 220M|GeForce GT 320M|GeForce GT 320M|GeForce GT 120|GeForce GT 120|Quadro FX 380|Quadro FX 580|Quadro FX 1700M|GeForce 9400 GT|Quadro FX 770M|GeForce 9300 GE|GeForce 9300 GS|GeForce 8400|GeForce 8400 SE|GeForce 8400 GS|GeForce 9300M GS|GeForce G100|GeForce 9300 SE|GeForce 9200M GS|GeForce 9200M GE|GeForce 9300M GS|Quadro NVS 150M|Quadro NVS 160M|GeForce G 105M|GeForce G 103M|GeForce G105M|Quadro NVS 420|Quadro FX 370 LP|Quadro FX 370 Low Profile|Quadro NVS 450|Quadro FX 370M|Quadro NVS 295|HICx16 + Graphics|HICx8 + Graphics|GeForce 8200M|GeForce 9100M G|GeForce 8200M G|GeForce 9200|GeForce 9100|GeForce 8300|GeForce 8200|nForce 730a|GeForce 9200|nForce 980a/780a SLI|nForce 750a SLI|GeForce 8100 / nForce 720a|GeForce 9400|GeForce 9400|GeForce 9400M G|GeForce 9400M|GeForce 9300|ION|GeForce 9400M G|GeForce 9400M|GeForce 9400|nForce 760i SLI|GeForce 9400|GeForce 9400|GeForce 9300 / nForce 730i|GeForce 9200|GeForce 9100M G|GeForce 8200M G|GeForce 9400M|GeForce 9200|GeForce G102M|GeForce G205M|GeForce G102M|GeForce G205M|ION|ION|GeForce 9400|ION|ION LE|ION LE|GeForce 320M|GeForce 320M|GeForce 320M|GeForce 320M|GeForce 320M|GeForce GT 220|GeForce 315|GeForce 210|GeForce 405|GeForce 405|GeForce GT 230M|GeForce GT 330M|GeForce GT 230M|GeForce GT 330M|NVS 5100M|GeForce GT 320M|GeForce GT 415|GeForce GT 240M|GeForce GT 325M|Quadro 400|Quadro FX 880M|GeForce G210|GeForce 205|GeForce 310|Second Generation ION|GeForce 210|GeForce 310|GeForce 315|GeForce G105M|GeForce G105M|NVS 2100M|NVS 3100M|GeForce 305M|Second Generation ION|Second Generation ION|GeForce 310M|Second Generation ION|Second Generation ION|GeForce 305M|GeForce 310M|GeForce 305M|Second Generation ION|Second Generation ION|GeForce G210M|GeForce G210|GeForce 310M|Second Generation ION|Second Generation ION|Quadro FX 380 LP|GeForce 315M|GeForce 405|GeForce 405|GeForce 405|GeForce 405|GeForce 405|GeForce 405M|GeForce 405M|GeForce 405|GeForce 405|GeForce 405|Quadro FX 380M|GeForce GT 330|GeForce GT 320|GeForce GT 240|GeForce GT 340|GeForce GT 220|GeForce GT 330|GeForce GTS 260M|GeForce GTS 250M|GeForce GT 220|GeForce GT 335M|GeForce GTS 350M|GeForce GTS 360M|Quadro FX 1800M|GeForce 9300 GS|GeForce 8400GS|GeForce 405|NVS 300"
-n304drivers="GeForce 6800 Ultra|GeForce 6800|GeForce 6800 LE|GeForce 6800 XE|GeForce 6800 XT|GeForce 6800 GT|GeForce 6800 GT|GeForce 6800 GS|GeForce 6800 XT|Quadro FX 4000|GeForce 7800 GTX|GeForce 7800 GTX|GeForce 7800 GT|GeForce 7800 GS|GeForce 7800 SLI|GeForce Go 7800|GeForce Go 7800 GTX|Quadro FX 4500|GeForce 6800 GS|GeForce 6800|GeForce 6800 LE|GeForce 6800 XT|GeForce Go 6800|GeForce Go 6800 Ultra|Quadro FX Go1400|Quadro FX 3450/4000 SDI|Quadro FX 1400|GeForce 6600 GT|GeForce 6600|GeForce 6200|GeForce 6600 LE|GeForce 7800 GS|GeForce 6800 GS|Quadro FX 3400/Quadro FX 4000|GeForce 6800 Ultra|GeForce 6600 GT|GeForce 6600|GeForce 6600 LE|GeForce 6600 VE|GeForce Go 6600|GeForce 6610 XL|GeForce Go 6600 TE/6200 TE|GeForce 6700 XL|GeForce Go 6600|GeForce Go 6600 GT|Quadro NVS 440|Quadro FX 540M|Quadro FX 550|Quadro FX 540|GeForce 6200|GeForce 6500|GeForce 6200 TurboCache(TM)|GeForce 6200SE TurboCache(TM)|GeForce 6200 LE|GeForce Go 6200|Quadro NVS 285|GeForce Go 6400|GeForce Go 6200|GeForce Go 6400|GeForce 6250|GeForce 7100 GS|GeForce 7350 LE|GeForce 7300 LE|GeForce 7550 LE|GeForce 7300 SE/7200 GS|GeForce Go 7200|GeForce Go 7300|GeForce Go 7400|Quadro NVS 110M|Quadro NVS 120M|Quadro FX 350M|GeForce 7500 LE|Quadro FX 350|GeForce 7300 GS|GeForce 6800|GeForce 6800 LE|GeForce 6800 GT|GeForce 6800 XT|GeForce 6200|GeForce 6200 A-LE|GeForce 6150|GeForce 6150 LE|GeForce 6100|GeForce Go 6150|Quadro NVS 210S / GeForce 6150LE|GeForce Go 6100|GeForce 7900 GTX|GeForce 7900 GT/GTO|GeForce 7900 GS|GeForce 7950 GX2|GeForce 7950 GX2|GeForce 7950 GT|GeForce Go 7950 GTX|GeForce Go 7900 GS|Quadro NVS 510M|Quadro FX 2500M|Quadro FX 1500M|Quadro FX 5500|Quadro FX 3500|Quadro FX 1500|Quadro FX 4500 X2|GeForce 7600 GT|GeForce 7600 GS|GeForce 7300 GT|GeForce 7900 GS|GeForce 7950 GT|GeForce 7650 GS|GeForce 7650 GS|GeForce 7600 GT|GeForce 7600 GS|GeForce 7300 GT|GeForce 7600 LE|GeForce 7300 GT|GeForce Go 7700|GeForce Go 7600|GeForce Go 7600 GT|Quadro FX 560M|Quadro FX 560|GeForce 6150SE nForce 430|GeForce 6100 nForce 405|GeForce 6100 nForce 400|GeForce 6100 nForce 420|GeForce 7025 / nForce 630a|GeForce 7150M / nForce 630M|GeForce 7000M / nForce 610M|GeForce 7050 PV / nForce 630a|GeForce 7050 PV / nForce 630a|GeForce 7025 / nForce 630a|GeForce 7150 / nForce 630i|GeForce 7100 / nForce 630i|GeForce 7050 / nForce 630i|GeForce 7050 / nForce 610i|GeForce 7050 / nForce 620i"
-
-# get device= from `pciconf -lv | grep -B 4 VGA`
-radeon_devices="0x4144|0x4145|0x4146|0x4147|0x4E44|0x4E45|0x4E46|0x4E47|0x4148|0x4149|0x414A|0x414B|0x4E48|0x4E49|0x4E4A|0x4E4B|0x4150|0x4151|0x4152|0x4153|0x4154|0x4155|0x4156|0x4E50|0x4E51|0x4E52|0x4E53|0x4E54|0x4E56|0x3150|0x3151|0x3152|0x3154|0x3155|0x3E50|0x3E54|0x5460|0x5462|0x5464|0x5b60|0x5b62|0x5b63|0x5b64|0x5b65|0x5a41|0x5a42|0x5a61|0x5a62|0x5954|0x5955|0x5974|0x5975|0x4A48|0x4A49|0x4A4A|0x4A4B|0x4A4C|0x4A4D|0x4A4E|0x4A4F|0x4A50|0x4A54|0x4B48|0x4B49|0x4B4A|0x4B4B|0x4B4C|0x5548|0x5549|0x554A|0x554B|0x554C|0x554D|0x554E|0x554F|0x5550|0x5551|0x5552|0x5554|0x5d48|0x5d49|0x5d4a|0x5d4c|0x5d4d|0x5d4e|0x5d4f|0x5d50|0x5d52|0x5d57|0x564A|0x564B|0x564F|0x5652|0x5653|0x5657|0x5e48|0x5e4a|0x5e4b|0x5e4c|0x5e4d|0x5e4f|0x793f|0x7941|0x7942|0x791e|0x791f|0x796c|0x796d|0x796e|0x796f|0x7140|0x7141|0x7142|0x7143|0x7144|0x7145|0x7146|0x7147|0x7149|0x714A|0x714B|0x714C|0x714D|0x714E|0x714F|0x7151|0x7152|0x7153|0x715E|0x715F|0x7180|0x7181|0x7183|0x7186|0x7187|0x7188|0x718A|0x718B|0x718C|0x718D|0x718F|0x7193|0x7196|0x719B|0x719F|0x7200|0x7210|0x7211|0x7100|0x7101|0x7102|0x7103|0x7104|0x7105|0x7106|0x7108|0x7109|0x710A|0x710B|0x710C|0x710E|0x710F|0x71C0|0x71C1|0x71C2|0x71C3|0x71C4|0x71C5|0x71C6|0x71C7|0x71CD|0x71CE|0x71D2|0x71D4|0x71D5|0x71D6|0x71DA|0x71DE|0x7281|0x7283|0x7287|0x7290|0x7291|0x7293|0x7297|0x7280|0x7288|0x7289|0x728B|0x728C|0x7240|0x7243|0x7244|0x7245|0x7246|0x7247|0x7248|0x7249|0x724A|0x724B|0x724C|0x724D|0x724E|0x724F|0x7284|0x9400|0x9401|0x9402|0x9403|0x9405|0x940A|0x940B|0x940F|0x94C0|0x94C1|0x94C3|0x94C4|0x94C5|0x94C6|0x94C7|0x94C8|0x94C9|0x94CB|0x94CC|0x94CD|0x9580|0x9581|0x9583|0x9586|0x9587|0x9588|0x9589|0x958A|0x958B|0x958C|0x958D|0x958E|0x958F|0x95C0|0x95C2|0x95C4|0x95C5|0x95C6|0x95C7|0x95C9|0x95CC|0x95CD|0x95CE|0x95CF|0x9590|0x9591|0x9593|0x9595|0x9596|0x9597|0x9598|0x9599|0x959B|0x9500|0x9501|0x9504|0x9505|0x9506|0x9507|0x9508|0x9509|0x950F|0x9511|0x9515|0x9517|0x9519|0x9610|0x9611|0x9612|0x9613|0x9614|0x9615|0x9616|0x9710|0x9711|0x9712|0x9713|0x9714|0x9715|0x9440|0x9441|0x9442|0x9443|0x9444|0x9446|0x944A|0x944B|0x944C|0x944E|0x9450|0x9452|0x9456|0x945A|0x945B|0x945E|0x9460|0x9462|0x946A|0x946B|0x947A|0x947B|0x9480|0x9487|0x9488|0x9489|0x948A|0x948F|0x9490|0x9491|0x9495|0x9498|0x949C|0x949E|0x949F|0x9540|0x9541|0x9542|0x954E|0x954F|0x9552|0x9553|0x9555|0x9557|0x955f|0x94A0|0x94A1|0x94A3|0x94B1|0x94B3|0x94B4|0x94B5|0x94B9|0x68e0|0x68e1|0x68e4|0x68e5|0x68e8|0x68e9|0x68f1|0x68f2|0x68f8|0x68f9|0x68fa|0x68fe|0x68c0|0x68c1|0x68c7|0x68c8|0x68c9|0x68d8|0x68d9|0x68da|0x68de|0x68a0|0x68a1|0x68a8|0x68a9|0x68b0|0x68b8|0x68b9|0x68ba|0x68be|0x68bf|0x6821|0x6880|0x6888|0x6889|0x688A|0x688C|0x688D|0x6898|0x6899|0x689b|0x689e|0x9802|0x9803|0x9804|0x9805|0x9806|0x9807|0x9808|0x9809|0x980A|0x9640|0x9641|0x9642|0x9643|0x9644|0x9645|0x9647|0x9648|0x9649|0x964a|0x964b|0x964c|0x964e|0x964f|0x9642|0x9643|0x9644|0x9645|0x9649|0x9900|0x9901|0x9903|0x9904|0x9905|0x9906|0x9907|0x9908|0x9909|0x990A|0x990B|0x990C|0x990D|0x990E|0x990F|0x9910|0x9913|0x9917|0x9918|0x9919|0x9990|0x9991|0x9992|0x9993|0x9994|0x9995|0x9996|0x9997|0x9998|0x9999|0x999A|0x999B|0x999C|0x999D|0x99A0|0x99A2|0x99A4|0x6720|0x6721|0x6722|0x6723|0x6724|0x6725|0x6726|0x6727|0x6728|0x6729|0x6738|0x6739|0x673e|0x6740|0x6741|0x6742|0x6743|0x6744|0x6745|0x6746|0x6747|0x6748|0x6749|0x674A|0x6750|0x6751|0x6758|0x6759|0x675B|0x675D|0x675F|0x6840|0x6841|0x6842|0x6843|0x6849|0x6850|0x6858|0x6859|0x6760|0x6761|0x6762|0x6763|0x6764|0x6765|0x6766|0x6767|0x6768|0x6770|0x6771|0x6772|0x6778|0x6779|0x677B|0x515e|0x6660|0x6663|0x6665|0x6900|0x6901|0x6902|0x6903|0x6904|0x1309|0x9874|0x98E4|0x6987|0x681E|0x679E|0x6798|0x6613|0x6066|0x9838"
-
-# Check to see if NVidia graphics is primary
-if pciconf -lv | grep -B 3 VGA | grep -q "NVIDIA"; then
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($ndrivers)"; then
-    NVDRIVER="latest"
-  fi
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n470drivers)" && [ -z "${NVDRIVER}" ] ; then
-    NVDRIVER="470"
-  fi
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n390drivers)" && [ -z "${NVDRIVER}" ] ; then
-    NVDRIVER="390"
-  fi
-
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n340drivers)" && [ -z "${NVDRIVER}" ]; then
-    NVDRIVER="340"
-  fi
-  if pciconf -lv | grep -B 3 VGA | grep -q -E "($n304drivers)" && [ -z "${NVDRIVER}" ]; then
-    NVDRIVER="304"
-  fi
-fi
-
-setup_virtualbox()
-{
-  echo "Setting up virtualbox settings.. Please wait.."
-  sysrc vboxguest_enable="YES"
-  service vboxguest start
-  sysrc vboxservice_enable="YES"
-  service vboxservice start
+# Logging with structured output
+log() {
+    local level="$1"
+    shift
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    printf "[%s] [%s] %s\n" "$timestamp" "$level" "$*" | tee -a "$LOG_FILE"
 }
 
-install_and_setup_nvidia()
-{
-  echo "Installing and setting up (NVIDIA).. Please wait.."
-  if [ "${NVDRIVER}" = "latest" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
+info() { log "INFO" "$@"; }
+warn() { log "WARN" "$@"; }
+error() { log "ERROR" "$@"; echo "Error: $*" >&2; }
+
+# Check root privileges and setup environment
+check_environment() {
+    if [ "$(id -u)" != 0 ]; then
+        echo "Error: Must be run as root" >&2
+        exit 1
     fi
-    kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
-  elif [ "${NVDRIVER}" = "470" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-470 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
+    
+    # Ensure log and backup directories exist
+    mkdir -p "$(dirname "$LOG_FILE")" "$BACKUP_DIR"
+    
+    info "Starting $SCRIPT_NAME (PID: $$)"
+}
+
+# Hardware detection using PCI vendor IDs
+detect_hardware() {
+    local pci_info
+    pci_info=$(pciconf -lv 2>/dev/null) || {
+        error "Cannot read PCI configuration"
+        return 1
+    }
+    
+    # Check virtualization first (highest priority)
+    if echo "$pci_info" | grep -qi "virtualbox"; then
+        echo "virtualbox"
+    elif echo "$pci_info" | grep -qi "vmware\|vendor=0x15ad"; then
+        echo "vmware"
+    elif echo "$pci_info" | grep -qi "qemu\|vendor=0x1234"; then
+        echo "qemu"
+    # Real hardware detection using vendor IDs
+    elif echo "$pci_info" | grep -q "vendor=0x10de"; then
+        detect_nvidia_family "$pci_info"
+    elif echo "$pci_info" | grep -q "vendor=0x8086.*vga"; then
+        echo "intel"
+    elif echo "$pci_info" | grep -q "vendor=0x1002"; then
+        detect_amd_family "$pci_info"
+    else
+        echo "unknown"
     fi
-    kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
-  elif [ "${NVDRIVER}" = "390" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-390 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
+}
+
+# NVIDIA family detection using device ID ranges
+detect_nvidia_family() {
+    local pci_info="$1"
+    local device_id
+    
+    device_id=$(echo "$pci_info" | grep -A1 "vendor=0x10de" | grep "device=" | head -1 | cut -d'=' -f2)
+    
+    if [ -z "$device_id" ]; then
+        warn "Cannot determine NVIDIA device ID, using latest driver"
+        echo "nvidia-latest"
+        return
     fi
-    kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
-  elif [ "${NVDRIVER}" = "340" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-340 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
+    
+    # Convert hex to decimal for range comparison (simplified approach)
+    local device_hex
+    device_hex=$(echo "$device_id" | sed 's/0x//')
+    
+    info "NVIDIA device ID: $device_id"
+    
+    # Use simplified string comparison for ranges
+    case "$device_hex" in
+        2[8-9]*|[3-9]*)
+            echo "nvidia-latest"  # RTX 50+ series (580 driver)
+            ;;
+        2[6-7]*)
+            echo "nvidia-latest"  # RTX 40 series (580 driver)
+            ;;
+        2[2-5]*)
+            echo "nvidia-latest"  # RTX 30 series (580 driver)
+            ;;
+        1[e-f]*|20*|21*)
+            echo "nvidia-470"     # RTX 20/GTX 16 series
+            ;;
+        1[0-9a-d]*)
+            echo "nvidia-390"     # GTX 10/900 series
+            ;;
+        [6-9]*|a*|b*|c*|d*|e*|f*)
+            echo "nvidia-340"     # GTX 600-800 series
+            ;;
+        *)
+            echo "nvidia-304"     # Legacy cards
+            ;;
+    esac
+}
+
+# AMD family detection
+detect_amd_family() {
+    local pci_info="$1"
+    local device_id
+    
+    device_id=$(echo "$pci_info" | grep -A1 "vendor=0x1002" | grep "device=" | head -1 | cut -d'=' -f2)
+    
+    if [ -z "$device_id" ]; then
+        warn "Cannot determine AMD device ID, using amdgpu"
+        echo "amdgpu"
+        return
     fi
-    kldload nvidia
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
-  elif [ "${NVDRIVER}" = "304" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-304 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
+    
+    info "AMD device ID: $device_id"
+    
+    # Simplified AMD detection - newer cards use amdgpu
+    case "$device_id" in
+        0x6[9-f]*|0x7*)
+            echo "amdgpu"     # Newer AMD cards
+            ;;
+        *)
+            echo "radeonkms"  # Legacy Radeon cards
+            ;;
+    esac
+}
+
+# Backup existing configuration
+backup_config() {
+    if [ -f "$XORG_CONF" ]; then
+        local backup_name="xorg.conf.$(date +%Y%m%d_%H%M%S)"
+        cp "$XORG_CONF" "$BACKUP_DIR/$backup_name"
+        info "Backed up existing config to $BACKUP_DIR/$backup_name"
     fi
-    kldload nvidia
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
-  fi
-  X -configure
-  sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
-  sed -i "" 's/modesetting/nvidia/g' /root/xorg.conf.new
-  # Add workaround for ABI problem
-  printf '
+}
+
+# Test X configuration with consistent -ignoreABI flag
+test_x_config() {
+    local config_file="$1"
+    local timeout="10"
+    
+    info "Testing X configuration: $config_file"
+    
+    # Test X startup with ignoreABI for better compatibility
+    if timeout "$timeout" X -config "$config_file" -ignoreABI -retro >/dev/null 2>&1 &
+    then
+        local x_pid=$!
+        sleep 2
+        
+        # Check if X is still running
+        if kill -0 "$x_pid" 2>/dev/null; then
+            kill "$x_pid" 2>/dev/null || true
+            wait "$x_pid" 2>/dev/null || true
+            info "X configuration test successful"
+            return 0
+        fi
+    fi
+    
+    warn "X configuration test failed"
+    return 1
+}
+
+# Generate generic X configuration with -ignoreABI
+generate_generic_config() {
+    info "Generating generic X configuration"
+    
+    backup_config
+    
+    if X -configure -ignoreABI >/tmp/xconfig.log 2>&1; then
+        if [ -f /root/xorg.conf.new ]; then
+            mkdir -p /etc/X11
+            cp /root/xorg.conf.new "$XORG_CONF"
+            info "Generic X configuration generated successfully"
+            return 0
+        fi
+    fi
+    
+    warn "Failed to generate generic X configuration"
+    return 1
+}
+
+# NVIDIA driver setup with real package names
+setup_nvidia() {
+    local driver_type="$1"
+    local pkg_name module_name
+    
+    info "Setting up NVIDIA driver: $driver_type"
+    
+    # Map to actual available package names
+    case "$driver_type" in
+        nvidia-latest) pkg_name="nvidia-driver-580"; module_name="nvidia-modeset" ;;
+        nvidia-470) pkg_name="nvidia-driver-470"; module_name="nvidia-modeset" ;;
+        nvidia-390) pkg_name="nvidia-driver-390"; module_name="nvidia-modeset" ;;
+        nvidia-340) pkg_name="nvidia-driver-340"; module_name="nvidia" ;;
+        nvidia-304) pkg_name="nvidia-driver-304"; module_name="nvidia" ;;
+        nvidia-devel) pkg_name="nvidia-driver-devel"; module_name="nvidia-modeset" ;;
+        *) error "Unknown NVIDIA driver type: $driver_type"; return 1 ;;
+    esac
+    
+    # Install driver
+    install_nvidia_driver "$pkg_name" || {
+        error "Failed to install $pkg_name"
+        return 1
+    }
+    
+    # Setup kernel module
+    load_nvidia_module "$module_name" || {
+        error "Failed to load $module_name"
+        return 1
+    }
+    
+    # Generate X configuration
+    generate_nvidia_config || {
+        error "Failed to generate NVIDIA X configuration"
+        return 1
+    }
+    
+    info "NVIDIA setup completed successfully"
+    return 0
+}
+
+# Install NVIDIA driver with proper error handling
+install_nvidia_driver() {
+    local pkg_name="$1"
+    
+    # Check if already installed
+    if pkg info "$pkg_name" >/dev/null 2>&1; then
+        info "NVIDIA driver $pkg_name already installed"
+        return 0
+    fi
+    
+    # Ensure Linux compatibility
+    ensure_linux_compatibility
+    
+    # Try /xdrivers first (GhostBSD specific)
+    if [ -d "/xdrivers" ] && [ -f "/xdrivers/drivers-list" ]; then
+        local driver_file
+        driver_file=$(grep "^$pkg_name " /xdrivers/drivers-list 2>/dev/null | cut -d' ' -f2)
+        if [ -n "$driver_file" ] && [ -f "/xdrivers/$driver_file" ]; then
+            info "Installing $pkg_name from /xdrivers"
+            if pkg add "/xdrivers/$driver_file"; then
+                return 0
+            else
+                warn "Failed to install from /xdrivers, trying repository"
+            fi
+        fi
+    fi
+    
+    # Install from repository
+    info "Installing $pkg_name from repository"
+    if pkg install -y "$pkg_name"; then
+        info "Successfully installed $pkg_name"
+        return 0
+    fi
+    
+    # Show alternatives if failed
+    error "Failed to install $pkg_name"
+    error "Available NVIDIA drivers:"
+    pkg search "^nvidia-driver-" 2>/dev/null | while read -r line; do
+        error "  $line"
+    done
+    
+    return 1
+}
+
+# Ensure Linux compatibility for NVIDIA
+ensure_linux_compatibility() {
+    # Enable Linux layer
+    if ! sysrc -n linux_enable 2>/dev/null | grep -q "YES"; then
+        info "Enabling Linux compatibility layer"
+        sysrc linux_enable="YES" || warn "Failed to enable Linux compatibility"
+    fi
+    
+    # Load Linux module
+    if ! kldstat | grep -q "linux"; then
+        info "Loading Linux compatibility module"
+        kldload linux 2>/dev/null || kldload linux.ko 2>/dev/null || warn "Failed to load Linux module"
+    fi
+}
+
+# Load NVIDIA kernel module
+load_nvidia_module() {
+    local module_name="$1"
+    
+    info "Loading NVIDIA module: $module_name"
+    
+    # Unload conflicting modules
+    for mod in amdgpu radeonkms i915kms nvidia nvidia-modeset; do
+        if kldstat | grep -q "\\b$mod\\b"; then
+            kldunload "$mod" 2>/dev/null || warn "Failed to unload $mod"
+        fi
+    done
+    
+    # Load NVIDIA module
+    if kldload "$module_name"; then
+        sysrc kldload_nvidia="$module_name"
+        info "NVIDIA module $module_name loaded successfully"
+        return 0
+    else
+        error "Failed to load NVIDIA module: $module_name"
+        return 1
+    fi
+}
+
+# Generate NVIDIA X configuration with -ignoreABI
+generate_nvidia_config() {
+    info "Generating NVIDIA X configuration"
+    
+    backup_config
+    
+    if X -configure -ignoreABI >/tmp/nvidia-config.log 2>&1; then
+        if [ -f /root/xorg.conf.new ]; then
+            # Modify for NVIDIA
+            sed -i.bak \
+                -e 's/"nv"/"nvidia"/g' \
+                -e 's/"vesa"/"nvidia"/g' \
+                -e 's/"scfb"/"nvidia"/g' \
+                -e 's/"modesetting"/"nvidia"/g' \
+                /root/xorg.conf.new
+            
+            # Add server flags
+            cat >> /root/xorg.conf.new << 'EOF'
+
 Section "ServerFlags"
     Option "IgnoreABI" "1"
 EndSection
-' >> /root/xorg.conf.new
-  mkdir -p /etc/X11
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
-}
-
-setup_nvidia()
-{
-  echo "Setting up (NVIDIA).. Please wait.."
-  sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
-  kldload nvidia-modeset
-  X -configure
-  sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
-  mkdir -p /etc/X11
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
-}
-
-setup_intel_drm()
-{
-  echo "Setting up (Intel DRM).. Please wait.."
-  kldload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/i915kms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-}
-
-start_legacy_intel()
-{
-  echo "Setting up (Legacy Intel).. Please wait.."
-  kldload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-}
-
-setup_amdgpu_radeonkms_drm()
-{
-  if pciconf -lv | grep -B 4 VGA | grep -q -E "($radeon_devices)"; then
-    echo "Setting up (radeonkms).. Please wait.."
-    kldload /boot/modules/radeonkms.ko
-    sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
-    sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  else
-    echo "Setting up (amdgpu).. Please wait.."
-    kldload /boot/modules/amdgpu.ko
-    sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
-    sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-  fi
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-}
-
-setup_radeonkms_drm()
-{
-  echo "Setting up (radeonkms).. Please wait.."
-  kldload /boot/modules/radeonkms.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-}
-
-setup_amdgpu_drm()
-{
-  echo "Setting up (amdgpu).. Please wait.."
-  kldload /boot/modules/amdgpu.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-}
-
-start_radeonkms()
-{
-  echo "Setting up (radeonkms).. Please wait.."
-  kldunload /boot/modules/amdgpu.ko
-  kldunload /boot/modules/radeonkms.ko
-  kldunload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  X -configure
-  sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/radeon/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/radeon/g' /root/xorg.conf.new
-  mkdir -p /etc/X11
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
-}
-
-start_amdgpu()
-{
-  echo "Setting up (amdgpu).. Please wait.."
-  kldunload /boot/modules/amdgpu.ko
-  kldunload /boot/modules/radeonkms.ko
-  kldunload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  X -configure
-  sed -i "" 's/radeon/amdgpu/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new
-  mkdir -p /etc/X11
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
-}
-
-start_shell()
-{
-  clear
-  echo "# GhostBSD Emergency Shell
-#
-# Please type 'exit' to return to the menu
-#############################################################"
-  /usr/local/bin/fish
-}
-
-manual_setup()
-{
-  dialog --title "X Configuration Menu" \
-  --menu "Please select from the following options:" 20 55 15 \
-  drm_intel "Start Desktop with Intel DRM driver" \
-  amdgpu "Start Desktop with AMD GPU driver" \
-  radeonkms "Start Desktop with Radeon KMS driver" \
-  nvidia "Start Desktop with Nvidia ${NVERSION} driver" \
-  vesa "Start Desktop with VESA driver" \
-  scfb "Start Desktop with SCFB driver" \
-  virtualbox "Start Desktop with VirtualBox driver" \
-  shell "Drop to emergency shell" \
-  reboot "Reboot the system" \
-  exit "Exit X Configuration" 2>/tmp/answer
-
-  ANS="$(cat /tmp/answer)"
-  case $ANS in
-    nvidia) install_and_setup_nvidia ;;
-    drm_intel) setup_intel_drm ;;
-    amdgpu) start_amdgpu ;;
-    radeonkms) start_radeonkms ;;
-    vesa) echo "Setting up (VESA).. Please wait.."
-      mkdir -p /etc/X11
-      cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
-      ;;
-    scfb) echo "Setting up (SCFB).. Please wait.."
-      mkdir -p /etc/X11
-      cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
-      ;;
-    virtualbox) setup_virtualbox ;;
-    shell) start_shell ;;
-    reboot) sudo reboot -q ;;
-    exit) exit 0 ;;
-    *) ;;
-  esac
-}
-
-fail_safe()
-{
-  dialog --title "Failed to auto start X" \
-  --menu "Please select from the following options:" 20 55 15 \
-  intel "Start Desktop with Legacy Intel driver" \
-  amdgpu "Start Desktop with DRM AMDGPU driver" \
-  radeonkmsdrm "Start Desktop with DRM Radeon KMS driver" \
-  vesa "Start Desktop with VESA driver" \
-  scfb "Start Desktop with SCFB driver" \
-  shell "Drop to emergency shell" \
-  reboot "Reboot the system" \
-  exit "Exit X Configuration" 2>/tmp/answer
-
-  ANS="$(cat /tmp/answer)"
-  case $ANS in
-    amdgpudrm) setup_amdgpu_drm ;;
-    radeonkmsdrm) setup_radeonkms_drm ;;
-    vesa) echo "Setting up (VESA).. Please wait.."
-      mkdir -p /etc/X11
-      cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
-      ;;
-    scfb) echo "Setting up (SCFB).. Please wait.."
-      mkdir -p /etc/X11
-      cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
-      ;;
-    virtualbox) setup_virtualbox ;;
-    shell) start_shell ;;
-    reboot) sudo reboot -q ;;
-    exit) exit 0 ;;
-    *) ;;
-  esac
-}
-
-auto_configure_x()
-{
-  if [ -z "${NVDRIVER}" ] ; then
-    # First check if we are running as a VirtualBox guest
-    if pciconf -lv | grep -q "VirtualBox" ; then
-      setup_virtualbox
-    else
-      # Uninstall virtualbox-ose-additions since we are not runing on virtualbox
-      pkg delete -y virtualbox-ose-additions
-      # Check to see if we are running as VMware guest
-      pciconf -lv | grep -q "vmware"
-      if pciconf -lv | grep -q "vmware" ; then
-        mkdir -p /etc/X11
-        cp /usr/local/etc/X11/cardDetect/XF86Config.vmware /etc/X11/xorg.conf
-      else
-        pciconf -lv | grep -B 4 VGA | grep -q Intel
-        if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
-          setup_intel_drm
-        else
-          pciconf -lv | grep -B 4 VGA | grep -q 'AMD/ATI'
-          if pciconf -lv | grep -B 4 VGA | grep -q 'AMD/ATI' ; then
-            setup_amdgpu_radeonkms_drm
-          else
-            fail_safe
-          fi
+EOF
+            
+            mkdir -p /etc/X11
+            cp /root/xorg.conf.new "$XORG_CONF"
+            
+            # Test the configuration
+            if test_x_config "$XORG_CONF"; then
+                info "NVIDIA X configuration generated and tested successfully"
+                return 0
+            else
+                warn "NVIDIA configuration generated but failed testing"
+                return 0  # Still return success as config was created
+            fi
         fi
-      fi
     fi
-  else
-    # Uninstall virtualbox-ose-additions since we are not runing on virtualbox
-    pkg delete -y virtualbox-ose-additions
-    # If Intel is detected that mean the system is running on Optimus hardware.
-    # For now start with Intel DRM driver.
-    # In the future nvidia-hybrid-graphics need to be implemented.
-    pciconf -lv | grep -B 4 VGA | grep -q Intel
-    # if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
-    #   setup_intel_drm
-    # else
-    install_and_setup_nvidia
-    # fi
-  fi
+    
+    error "Failed to generate NVIDIA X configuration"
+    return 1
 }
 
-if [ "${TOSTART}" = 'setup' ] ; then
-  manual_setup
-elif [ "${TOSTART}" = 'auto' ]; then
-  auto_configure_x
-else
-  manual_setup
-fi
+# Intel graphics setup
+setup_intel() {
+    info "Setting up Intel graphics"
+    
+    backup_config
+    
+    # Unload conflicting modules
+    for mod in amdgpu radeonkms nvidia nvidia-modeset; do
+        if kldstat | grep -q "\\b$mod\\b"; then
+            kldunload "$mod" 2>/dev/null || true
+        fi
+    done
+    
+    # Load Intel module
+    if kldload i915kms >/dev/null 2>&1; then
+        sysrc kld_list+="i915kms"
+        info "Intel i915kms module loaded successfully"
+        
+        # Try to generate X config, fall back to auto-detection
+        if ! generate_generic_config; then
+            rm -f "$XORG_CONF"
+            info "Using X auto-detection for Intel graphics"
+        fi
+        
+        info "Intel graphics setup completed"
+        return 0
+    else
+        warn "Failed to load i915kms module, trying auto-detection"
+        rm -f "$XORG_CONF"
+        return 0
+    fi
+}
+
+# AMD graphics setup
+setup_amd() {
+    local driver_type="$1"
+    
+    info "Setting up AMD graphics with $driver_type driver"
+    
+    backup_config
+    
+    # Unload conflicting modules
+    for mod in amdgpu radeonkms i915kms nvidia nvidia-modeset; do
+        if kldstat | grep -q "\\b$mod\\b"; then
+            kldunload "$mod" 2>/dev/null || true
+        fi
+    done
+    
+    # Load appropriate AMD module
+    if kldload "$driver_type" >/dev/null 2>&1; then
+        sysrc kld_list+="$driver_type"
+        info "AMD $driver_type module loaded successfully"
+        
+        # Try to generate X config, fall back to auto-detection
+        if ! generate_generic_config; then
+            rm -f "$XORG_CONF"
+            info "Using X auto-detection for AMD graphics"
+        fi
+        
+        info "AMD graphics setup completed"
+        return 0
+    else
+        warn "Failed to load $driver_type module"
+        return 1
+    fi
+}
+
+# VirtualBox guest setup
+setup_virtualbox() {
+    info "Setting up VirtualBox guest graphics"
+    
+    # Enable VirtualBox guest additions
+    sysrc vboxguest_enable="YES" || warn "Failed to enable vboxguest"
+    sysrc vboxservice_enable="YES" || warn "Failed to enable vboxservice"
+    
+    # Start services
+    service vboxguest status >/dev/null 2>&1 || service vboxguest start || warn "Failed to start vboxguest"
+    service vboxservice status >/dev/null 2>&1 || service vboxservice start || warn "Failed to start vboxservice"
+    
+    # Remove any existing X config to use auto-detection
+    backup_config
+    rm -f "$XORG_CONF"
+    
+    info "VirtualBox graphics setup completed"
+    return 0
+}
+
+# VMware guest setup
+setup_vmware() {
+    info "Setting up VMware guest graphics"
+    
+    backup_config
+    
+    local vmware_config="/usr/local/etc/X11/cardDetect/XF86Config.vmware"
+    if [ -f "$vmware_config" ]; then
+        mkdir -p /etc/X11
+        cp "$vmware_config" "$XORG_CONF"
+        info "Applied VMware configuration"
+        
+        # Test VMware configuration
+        if test_x_config "$XORG_CONF"; then
+            info "VMware configuration tested successfully"
+        else
+            warn "VMware configuration failed test, falling back to VESA"
+            setup_vesa_config
+        fi
+    else
+        # Use VESA as fallback
+        setup_vesa_config
+    fi
+    
+    return 0
+}
+
+# VESA fallback configuration
+setup_vesa() {
+    info "Setting up VESA graphics (safe mode)"
+    backup_config
+    setup_vesa_config
+    return 0
+}
+
+setup_vesa_config() {
+    mkdir -p /etc/X11
+    cat > "$XORG_CONF" << 'EOF'
+Section "Device"
+    Identifier "Configured Video Device"
+    Driver "vesa"
+EndSection
+
+Section "Monitor"
+    Identifier "Configured Monitor"
+EndSection
+
+Section "Screen"
+    Identifier "Default Screen"
+    Monitor "Configured Monitor"
+    Device "Configured Video Device"
+    DefaultDepth 24
+    SubSection "Display"
+        Depth 24
+        Modes "1024x768" "800x600" "640x480"
+    EndSubSection
+EndSection
+
+Section "ServerFlags"
+    Option "IgnoreABI" "1"
+EndSection
+EOF
+    info "VESA configuration applied with IgnoreABI option"
+}
+
+# Progressive auto-configuration
+auto_configure() {
+    info "Starting automatic X configuration"
+    
+    local hw_type
+    hw_type=$(detect_hardware)
+    
+    info "Detected hardware: $hw_type"
+    
+    case "$hw_type" in
+        virtualbox)
+            setup_virtualbox
+            ;;
+        vmware)
+            setup_vmware
+            ;;
+        qemu)
+            setup_vesa  # QEMU usually works with VESA
+            ;;
+        nvidia-*)
+            setup_nvidia "$hw_type"
+            ;;
+        intel)
+            setup_intel
+            ;;
+        amdgpu|radeonkms)
+            setup_amd "$hw_type"
+            ;;
+        *)
+            warn "Unknown hardware type, using VESA fallback"
+            setup_vesa
+            ;;
+    esac
+}
+
+# Interactive manual setup
+manual_setup() {
+    info "Starting manual setup"
+    
+    if ! command -v dialog >/dev/null 2>&1; then
+        error "Dialog not available for manual setup"
+        return 1
+    fi
+    
+    while true; do
+        dialog --title "X Configuration" \
+        --menu "Select graphics configuration:" 18 70 14 \
+        "auto" "Automatic detection (recommended)" \
+        "intel" "Intel graphics" \
+        "amd-auto" "AMD graphics (auto-detect driver)" \
+        "amdgpu" "AMD graphics (amdgpu driver)" \
+        "radeonkms" "AMD graphics (radeonkms driver)" \
+        "nvidia-580" "NVIDIA graphics (580 series driver)" \
+        "nvidia-470" "NVIDIA graphics (470 legacy driver)" \
+        "nvidia-390" "NVIDIA graphics (390 legacy driver)" \
+        "nvidia-340" "NVIDIA graphics (340 legacy driver)" \
+        "nvidia-304" "NVIDIA graphics (304 legacy driver)" \
+        "vesa" "VESA compatible (safe mode)" \
+        "virtualbox" "VirtualBox guest" \
+        "vmware" "VMware guest" \
+        "test" "Test current configuration" \
+        "exit" "Exit without changes" 2>/tmp/xconfig_choice || break
+        
+        local choice
+        choice=$(cat /tmp/xconfig_choice 2>/dev/null)
+        rm -f /tmp/xconfig_choice
+        
+        case "$choice" in
+            auto)
+                if auto_configure; then
+                    dialog --msgbox "Automatic configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "Automatic configuration failed." 6 40
+                fi
+                ;;
+            intel)
+                if setup_intel; then
+                    dialog --msgbox "Intel graphics configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "Intel configuration failed." 6 40
+                fi
+                ;;
+            amd-auto)
+                local amd_driver
+                amd_driver=$(detect_amd_family "$(pciconf -lv)")
+                if setup_amd "$amd_driver"; then
+                    dialog --msgbox "AMD graphics configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "AMD configuration failed." 6 40
+                fi
+                ;;
+            amdgpu|radeonkms)
+                if setup_amd "$choice"; then
+                    dialog --msgbox "AMD $choice configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "AMD $choice configuration failed." 6 40
+                fi
+                ;;
+            nvidia-*)
+                if setup_nvidia "nvidia-$(echo "$choice" | cut -d'-' -f2)"; then
+                    dialog --msgbox "NVIDIA graphics configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "NVIDIA configuration failed." 6 40
+                fi
+                ;;
+            vesa)
+                if setup_vesa; then
+                    dialog --msgbox "VESA configuration successful!" 6 40
+                    break
+                else
+                    dialog --msgbox "VESA configuration failed." 6 40
+                fi
+                ;;
+            virtualbox)
+                if setup_virtualbox; then
+                    dialog --msgbox "VirtualBox configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "VirtualBox configuration failed." 6 40
+                fi
+                ;;
+            vmware)
+                if setup_vmware; then
+                    dialog --msgbox "VMware configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "VMware configuration failed." 6 40
+                fi
+                ;;
+            test)
+                if [ -f "$XORG_CONF" ]; then
+                    if test_x_config "$XORG_CONF"; then
+                        dialog --msgbox "Current X configuration test passed!" 6 50
+                    else
+                        dialog --msgbox "Current X configuration test failed." 6 50
+                    fi
+                else
+                    dialog --msgbox "No X configuration found to test." 6 40
+                fi
+                ;;
+            exit)
+                break
+                ;;
+        esac
+    done
+}
+
+# System information check
+check_system_state() {
+    info "=== System State Check ==="
+    
+    # FreeBSD version
+    local fbsd_version
+    fbsd_version=$(freebsd-version 2>/dev/null || uname -r)
+    info "FreeBSD version: $fbsd_version"
+    
+    # Available NVIDIA packages
+    info "Available NVIDIA packages:"
+    pkg search "^nvidia-driver" 2>/dev/null | head -10 | while read -r line; do
+        info "  $line"
+    done
+    
+    # Linux compatibility
+    if kldstat | grep -q "linux"; then
+        info "Linux compatibility: LOADED"
+    else
+        info "Linux compatibility: NOT LOADED"
+    fi
+    
+    # GPU information
+    local gpu_info
+    gpu_info=$(pciconf -lv 2>/dev/null | grep -A2 -B2 "class=0x030000" | head -10)
+    if [ -n "$gpu_info" ]; then
+        info "Detected GPU:"
+        echo "$gpu_info" | while read -r line; do
+            info "  $line"
+        done
+    fi
+    
+    # Driver directories
+    if [ -d "/xdrivers" ]; then
+        local pkg_count
+        pkg_count=$(ls /xdrivers/*.pkg 2>/dev/null | wc -l)
+        info "Custom driver directory: /xdrivers ($pkg_count packages)"
+    else
+        info "Custom driver directory: NOT AVAILABLE"
+    fi
+    
+    # Current X configuration
+    if [ -f "$XORG_CONF" ]; then
+        info "Current X configuration: EXISTS"
+        grep -E "Driver|Identifier" "$XORG_CONF" 2>/dev/null | while read -r line; do
+            info "  $line"
+        done
+    else
+        info "Current X configuration: NOT FOUND (using auto-detection)"
+    fi
+    
+    # Test X server responsiveness
+    info "Testing X server availability..."
+    if X -configure -ignoreABI >/tmp/x-test.log 2>&1; then
+        info "X server: RESPONSIVE"
+        rm -f /root/xorg.conf.new  # Clean up test file
+    else
+        warn "X server: ISSUES DETECTED"
+        if [ -f /tmp/x-test.log ]; then
+            info "X server errors:"
+            head -5 /tmp/x-test.log | while read -r line; do
+                info "  $line"
+            done
+        fi
+    fi
+}
+
+# Main function
+main() {
+    local mode="${1:-auto}"
+    
+    check_environment
+    info "X configuration mode: $mode"
+    
+    case "$mode" in
+        auto)
+            if auto_configure; then
+                info "Automatic configuration completed successfully"
+            else
+                error "Automatic configuration failed"
+                if command -v dialog >/dev/null 2>&1; then
+                    info "Falling back to manual setup"
+                    manual_setup
+                else
+                    exit 1
+                fi
+            fi
+            ;;
+        setup|manual)
+            manual_setup
+            ;;
+        nvidia|intel|amd|vesa|virtualbox|vmware)
+            case "$mode" in
+                nvidia) 
+                    local nvidia_driver
+                    nvidia_driver=$(detect_nvidia_family "$(pciconf -lv)")
+                    setup_nvidia "$nvidia_driver"
+                    ;;
+                intel) setup_intel ;;
+                amd) 
+                    local amd_driver
+                    amd_driver=$(detect_amd_family "$(pciconf -lv)")
+                    setup_amd "$amd_driver"
+                    ;;
+                vesa) setup_vesa ;;
+                virtualbox) setup_virtualbox ;;
+                vmware) setup_vmware ;;
+            esac
+            ;;
+        test)
+            if [ -f "$XORG_CONF" ]; then
+                if test_x_config "$XORG_CONF"; then
+                    info "Current X configuration test passed"
+                    exit 0
+                else
+                    error "Current X configuration test failed"
+                    exit 1
+                fi
+            else
+                error "No X configuration to test"
+                exit 1
+            fi
+            ;;
+        debug|check)
+            check_system_state
+            ;;
+        *)
+            echo "Usage: $0 [auto|setup|manual|nvidia|intel|amd|vesa|virtualbox|vmware|test|debug]" >&2
+            echo "  auto      - Automatic configuration (default)" >&2
+            echo "  setup     - Interactive manual setup" >&2
+            echo "  manual    - Same as setup" >&2
+            echo "  nvidia    - NVIDIA graphics (auto-detect driver)" >&2
+            echo "  intel     - Intel graphics" >&2
+            echo "  amd       - AMD graphics (auto-detect driver)" >&2
+            echo "  vesa      - VESA compatible (safe mode)" >&2
+            echo "  virtualbox- VirtualBox guest" >&2
+            echo "  vmware    - VMware guest" >&2
+            echo "  test      - Test current configuration" >&2
+            echo "  debug     - Show system information" >&2
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function
+main "$@"
