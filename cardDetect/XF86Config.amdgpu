@@ -1,0 +1,93 @@
+# AMD AMDGPU graphics xorg.conf file for GhostBSD/FreeBSD
+# For modern AMD Radeon graphics cards with amdgpu kernel module
+
+Section "ServerLayout"
+    Identifier     "AMDGPU Configured"
+    Screen      0  "Screen0" 0 0
+    InputDevice    "Mouse0" "CorePointer"
+    InputDevice    "Keyboard0" "CoreKeyboard"
+    Option         "AutoAddDevices" "Off"
+EndSection
+
+Section "Files"
+    ModulePath   "/usr/local/lib/modules"
+    ModulePath   "/usr/local/lib/xorg/modules"
+    FontPath     "/usr/local/share/fonts/misc/"
+    FontPath     "/usr/local/share/fonts/TTF/"
+    FontPath     "/usr/local/share/fonts/Type1/"
+    FontPath     "/usr/local/share/fonts/75dpi/"
+    FontPath     "/usr/local/share/fonts/100dpi/"
+    FontPath     "/usr/local/share/fonts/dejavu/"
+    FontPath     "/usr/local/share/fonts/TrueType/"
+EndSection
+
+Section "Module"
+    Load  "extmod"
+    Load  "record"
+    Load  "dbe"
+    Load  "glx"
+    Load  "dri"
+    Load  "dri2"
+    Load  "dri3"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Keyboard0"
+    Driver      "kbd"
+    Option      "Protocol" "standard"
+    Option      "XkbRules" "xorg"
+    Option      "XkbModel" "pc105"
+    Option      "XkbLayout" "us"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Mouse0"
+    Driver      "mouse"
+    Option      "Protocol" "auto"
+    Option      "Device" "/dev/sysmouse"
+    Option      "ZAxisMapping" "4 5 6 7"
+EndSection
+
+Section "Monitor"
+    Identifier   "Monitor0"
+    VendorName   "Generic Monitor"
+    ModelName    "AMD AMDGPU Monitor"
+    HorizSync    28.0 - 96.0
+    VertRefresh  50.0 - 75.0
+    Option       "DPMS"
+EndSection
+
+Section "Device"
+    Identifier  "Card0"
+    Driver      "amdgpu"
+    Option      "AccelMethod" "glamor"
+    Option      "DRI" "3"
+    Option      "TearFree" "true"
+    Option      "VariableRefresh" "true"
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Device     "Card0"
+    Monitor    "Monitor0"
+    DefaultDepth 24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     16
+        Modes    "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
+    EndSubSection
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+        Modes    "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
+    EndSubSection
+    SubSection "Display"
+        Viewport   0 0
+        Depth     32
+        Modes    "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
+    EndSubSection
+EndSection
+
+Section "DRI"
+    Mode 0666
+EndSection
