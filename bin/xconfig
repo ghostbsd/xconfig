@@ -75,6 +75,8 @@ detect_hardware() {
         echo "vmware"
     elif echo "$pci_info" | grep -qi "qemu\|vendor=0x1234"; then
         echo "qemu"
+    elif echo "$pci_info" | grep -qi "microsoft.*hyper-v\|vendor=0x1414"; then
+        echo "hyperv"
     # Real hardware detection using vendor IDs
     elif echo "$pci_info" | grep -q "vendor=0x10de"; then
         detect_nvidia_family "$pci_info"
@@ -374,14 +376,85 @@ setup_amd() {
         sysrc kld_list+="$driver_type"
         info "AMD $driver_type module loaded successfully"
         
-        # Let X auto-detect AMD graphics
-        rm -f "$XORG_CONF"
-        info "AMD graphics setup completed (using auto-detection)"
+        # Try external config first, fallback to auto-detection
+        if ! apply_external_config "$driver_type"; then
+            rm -f "$XORG_CONF"
+            info "AMD graphics setup completed (using auto-detection)"
+        fi
         return 0
     else
         warn "Failed to load $driver_type module"
         return 1
     fi
+}
+
+# Intel graphics setup (updated to use external config)
+setup_intel_config() {
+    info "Setting up Intel graphics with external configuration"
+    
+    backup_config
+    
+    # Unload conflicting modules
+    for mod in amdgpu radeonkms nvidia nvidia-modeset; do
+        if kldstat | grep -q "\\b$mod\\b"; then
+            kldunload "$mod" 2>/dev/null || true
+        fi
+    done
+    
+    # Load Intel module
+    if kldload i915kms >/dev/null 2>&1; then
+        sysrc kld_list+="i915kms"
+        info "Intel i915kms module loaded successfully"
+        
+        # Try external config first, fallback to auto-detection
+        if ! apply_external_config "intel"; then
+            rm -f "$XORG_CONF"
+            info "Intel graphics setup completed (using auto-detection)"
+        fi
+        return 0
+    else
+        warn "Failed to load i915kms module, trying auto-detection"
+        rm -f "$XORG_CONF"
+        return 0
+    fi
+}
+
+# Hyper-V guest setup
+setup_hyperv() {
+    info "Setting up Microsoft Hyper-V guest graphics"
+    
+    if ! apply_external_config "hyperv"; then
+        warn "External Hyper-V config not available, using SCFB fallback"
+        setup_scfb
+    fi
+    
+    return 0
+}
+
+# Safe mode setup
+setup_safe() {
+    info "Setting up safe mode configuration (minimal/recovery)"
+    
+    if ! apply_external_config "safe"; then
+        warn "External safe config not available, using basic VESA"
+        setup_vesa_config
+    fi
+    
+    return 0
+}
+
+# Dual monitor setup
+setup_dual() {
+    info "Setting up dual monitor configuration template"
+    
+    if ! apply_external_config "dual"; then
+        warn "External dual monitor config not available"
+        info "Please configure dual monitors manually or use xrandr"
+        return 1
+    fi
+    
+    info "Dual monitor template applied - you may need to adjust monitor names and positions"
+    return 0
 }
 
 # VirtualBox guest setup
@@ -531,6 +604,9 @@ auto_configure() {
         qemu)
             setup_qemu
             ;;
+        hyperv)
+            setup_hyperv
+            ;;
         nvidia-*)
             setup_nvidia "$hw_type"
             ;;
@@ -558,9 +634,10 @@ manual_setup() {
     
     while true; do
         dialog --title "X Configuration" \
-        --menu "Select graphics configuration:" 20 70 16 \
+        --menu "Select graphics configuration:" 22 70 20 \
         "auto" "Automatic detection (recommended)" \
-        "intel" "Intel graphics" \
+        "intel" "Intel graphics (with config file)" \
+        "intel-auto" "Intel graphics (auto-detection)" \
         "amd-auto" "AMD graphics (auto-detect driver)" \
         "amdgpu" "AMD graphics (amdgpu driver)" \
         "radeonkms" "AMD graphics (radeonkms driver)" \
@@ -571,9 +648,12 @@ manual_setup() {
         "nvidia-304" "NVIDIA graphics (304 legacy driver)" \
         "scfb" "SCFB (FreeBSD syscons framebuffer)" \
         "vesa" "VESA compatible (safe mode)" \
+        "safe" "Safe mode (minimal/recovery)" \
         "virtualbox" "VirtualBox guest" \
         "vmware" "VMware guest" \
         "qemu" "QEMU guest" \
+        "hyperv" "Microsoft Hyper-V guest" \
+        "dual" "Dual monitor template" \
         "exit" "Exit without changes" 2>/tmp/xconfig_choice || break
         
         local choice
@@ -590,6 +670,14 @@ manual_setup() {
                 fi
                 ;;
             intel)
+                if setup_intel_config; then
+                    dialog --msgbox "Intel graphics configured successfully!" 6 50
+                    break
+                else
+                    dialog --msgbox "Intel configuration failed." 6 40
+                fi
+                ;;
+            intel-auto)
                 if setup_intel; then
                     dialog --msgbox "Intel graphics configured successfully!" 6 50
                     break
@@ -661,6 +749,30 @@ manual_setup() {
                     break
                 else
                     dialog --msgbox "QEMU configuration failed." 6 40
+                fi
+                ;;
+            hyperv)
+                if setup_hyperv; then
+                    dialog --msgbox "Hyper-V configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "Hyper-V configuration failed." 6 40
+                fi
+                ;;
+            safe)
+                if setup_safe; then
+                    dialog --msgbox "Safe mode configuration successful!" 6 50
+                    break
+                else
+                    dialog --msgbox "Safe mode configuration failed." 6 40
+                fi
+                ;;
+            dual)
+                if setup_dual; then
+                    dialog --msgbox "Dual monitor template applied successfully!\\nYou may need to adjust monitor names." 8 60
+                    break
+                else
+                    dialog --msgbox "Dual monitor configuration failed." 6 40
                 fi
                 ;;
             exit)
@@ -759,14 +871,15 @@ main() {
         setup|manual)
             manual_setup
             ;;
-        nvidia|intel|amd|scfb|vesa|virtualbox|vmware|qemu)
+        nvidia|intel|intel-auto|amd|scfb|vesa|safe|virtualbox|vmware|qemu|hyperv|dual)
             case "$mode" in
                 nvidia) 
                     local nvidia_driver
                     nvidia_driver=$(detect_nvidia_family "$(pciconf -lv)")
                     setup_nvidia "$nvidia_driver"
                     ;;
-                intel) setup_intel ;;
+                intel) setup_intel_config ;;
+                intel-auto) setup_intel ;;
                 amd) 
                     local amd_driver
                     amd_driver=$(detect_amd_family "$(pciconf -lv)")
@@ -774,27 +887,34 @@ main() {
                     ;;
                 scfb) setup_scfb ;;
                 vesa) setup_vesa ;;
+                safe) setup_safe ;;
                 virtualbox) setup_virtualbox ;;
                 vmware) setup_vmware ;;
                 qemu) setup_qemu ;;
+                hyperv) setup_hyperv ;;
+                dual) setup_dual ;;
             esac
             ;;
         debug|check)
             check_system_state
             ;;
         *)
-            echo "Usage: $0 [auto|setup|manual|nvidia|intel|amd|scfb|vesa|virtualbox|vmware|qemu|debug]" >&2
+            echo "Usage: $0 [auto|setup|manual|nvidia|intel|intel-auto|amd|scfb|vesa|safe|virtualbox|vmware|qemu|hyperv|dual|debug]" >&2
             echo "  auto      - Automatic configuration (default)" >&2
             echo "  setup     - Interactive manual setup" >&2
             echo "  manual    - Same as setup" >&2
             echo "  nvidia    - NVIDIA graphics (auto-detect driver)" >&2
-            echo "  intel     - Intel graphics" >&2
+            echo "  intel     - Intel graphics (with config file)" >&2
+            echo "  intel-auto- Intel graphics (auto-detection)" >&2
             echo "  amd       - AMD graphics (auto-detect driver)" >&2
             echo "  scfb      - SCFB (FreeBSD syscons framebuffer)" >&2
             echo "  vesa      - VESA compatible (safe mode)" >&2
+            echo "  safe      - Safe mode (minimal/recovery)" >&2
             echo "  virtualbox- VirtualBox guest" >&2
             echo "  vmware    - VMware guest" >&2
             echo "  qemu      - QEMU guest" >&2
+            echo "  hyperv    - Microsoft Hyper-V guest" >&2
+            echo "  dual      - Dual monitor template" >&2
             echo "  debug     - Show system information" >&2
             exit 1
             ;;
