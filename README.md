@@ -2,12 +2,11 @@
 
 **Intelligent X11 Configuration Tool for GhostBSD**
 
-[![FreeBSD](https://img.shields.io/badge/FreeBSD-14.x%2B-red.svg)](https://www.freebsd.org/)
 [![GhostBSD](https://img.shields.io/badge/GhostBSD-25.x%2B-blue.svg)](https://ghostbsd.org/)
 [![License](https://img.shields.io/badge/License-BSD--2--Clause-green.svg)](LICENSE)
 [![Shell](https://img.shields.io/badge/Shell-POSIX%20sh-lightgrey.svg)](https://en.wikipedia.org/wiki/POSIX)
 
-xconfig is a comprehensive X Window System configuration automation tool designed specifically for FreeBSD and GhostBSD. It provides intelligent hardware detection, automatic driver installation, and optimized X11 configurations for a wide range of graphics hardware and virtualization platforms.
+xconfig is a comprehensive X Window System configuration automation tool designed specifically for GhostBSD. It provides intelligent hardware detection, automatic driver installation, and optimized X11 configurations for a wide range of graphics hardware and virtualization platforms.
 
 ## Features
 
