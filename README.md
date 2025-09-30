@@ -6,169 +6,168 @@
 [![License](https://img.shields.io/badge/License-BSD--2--Clause-green.svg)](LICENSE)
 [![Shell](https://img.shields.io/badge/Shell-POSIX%20sh-lightgrey.svg)](https://en.wikipedia.org/wiki/POSIX)
 
-xconfig is a comprehensive X Window System configuration automation tool designed specifically for GhostBSD. It provides intelligent hardware detection, automatic driver installation, and optimized X11 configurations for a wide range of graphics hardware and virtualization platforms.
+`xconfig` is a comprehensive X Window System configuration tool for GhostBSD/FreeBSD. It performs intelligent hardware detection, installs the right drivers, and applies optimized Xorg configurations for physical GPUs and common hypervisors. It includes an interactive **bsddialog**-based menu for manual selection.
 
-## Features
-
-- **Intelligent Hardware Detection**: Automatically detects graphics cards, virtualization platforms, and system configurations
-- **Automated Driver Installation**: Installs and configures appropriate graphics drivers with proper kernel module loading
-- **Comprehensive Platform Support**: Works with Intel, AMD, NVIDIA graphics, and all major virtualization platforms
-- **Interactive Configuration**: User-friendly dialog-based interface for manual configuration
-- **Modular Design**: External configuration files for easy maintenance and customization
-- **Recovery Mode**: Safe mode configurations for troubleshooting graphics issues
-- **Multi-Monitor Support**: Templates and configurations for dual-monitor setups
-- **Detailed Logging**: Comprehensive logging system for debugging and troubleshooting
+---
 
 ## Supported Hardware & Platforms
 
-### Graphics Hardware
-- **Intel Graphics**: i915kms driver with hardware acceleration
-- **AMD Graphics**: 
-  - Modern cards: amdgpu driver with DRI3 support
-  - Legacy cards: radeonkms driver with DRI2 support
-- **NVIDIA Graphics**: 
-  - Latest cards: nvidia-driver-580 (RTX 50/40/30 series)
-  - Legacy support: nvidia-driver-470/390/340/304
-- **Generic**: VESA and SCFB (FreeBSD syscons framebuffer) drivers
+### GPUs
 
-### Virtualization Platforms
-- **VirtualBox**: Guest additions integration
-- **VMware**: VMware Tools compatibility
-- **QEMU/KVM**: Cirrus and virtio graphics
-- **Microsoft Hyper-V**: Enhanced session support
-- **Generic VMs**: VESA fallback for unknown hypervisors
+* **Intel**: `i915kms` (auto or with external config)
+* **AMD**: `amdgpu` (modern) and `radeonkms` (legacy)
+* **NVIDIA**: auto classifies to a supported branch (e.g., `nvidia-driver-580/470/390/340/304`)
+* **Generic**: `vesa`, `scfb` (syscons framebuffer)
+
+### Virtualization
+
+* **VirtualBox** (vboxguest/vboxservice enable & start)
+* **VMware**
+* **QEMU/KVM**
+* **Microsoft Hyper-V**
+* **Unknown Hypervisors**: `vesa` fallback
+
+---
+
+## Requirements
+
+* GhostBSD / FreeBSD with `pkg`
+* `bsddialog` (preferred) or `dialog`
+* X Window components present on the system
+* Root privileges (`sudo`)
+
+> The script will also use `/xdrivers` (if available) for offline `.pkg` files, falling back to `pkg` repos otherwise.
+
+---
 
 ## Installation
 
 ### Quick Install
+
 ```bash
-# Clone the repository
+# Clone
 git clone https://github.com/yourusername/xconfig.git
 cd xconfig
 
-# Make executable and install
-chmod +x bin/xconfig
-sudo cp bin/xconfig /usr/local/bin/
-sudo cp -r cardDetect /usr/local/etc/X11/
-```
+# Install the script
+sudo install -m 755 bin/xconfig /usr/local/bin/xconfig
 
-### Manual Installation
-```bash
-# Copy script
-sudo install -m 755 bin/xconfig /usr/local/bin/
-
-# Create configuration directory
+# Install external config templates (system-wide)
 sudo mkdir -p /usr/local/etc/X11/cardDetect
-sudo cp cardDetect/* /usr/local/etc/X11/cardDetect/
+sudo cp -r cardDetect/* /usr/local/etc/X11/cardDetect/
 ```
+
+> The script also looks for `cardDetect` **next to the script** (`$SCRIPT_DIR/cardDetect`) so you can run in-tree during development.
+
+---
 
 ## Usage
 
-### Automatic Configuration (Recommended)
+### Automatic (recommended)
+
 ```bash
 sudo xconfig auto
 ```
-Detects hardware automatically and applies the best configuration.
 
-### Interactive Setup
+Detects hardware and applies the best configuration (including NVIDIA/AMD/Intel and hypervisors).
+
+### Interactive setup
+
 ```bash
 sudo xconfig setup
-```
-Opens a dialog-based interface for manual configuration selection.
-
-### Direct Configuration
-```bash
-# Configure for specific hardware
-sudo xconfig nvidia          # Auto-detect NVIDIA driver version
-sudo xconfig intel          # Intel graphics with config file
-sudo xconfig intel-auto     # Intel graphics with auto-detection
-sudo xconfig amd             # Auto-detect AMD driver
-sudo xconfig amdgpu         # Force amdgpu driver
-sudo xconfig radeonkms      # Force radeonkms driver
-
-# Configure for virtualization
-sudo xconfig virtualbox     # VirtualBox guest
-sudo xconfig vmware         # VMware guest
-sudo xconfig qemu           # QEMU/KVM guest
-sudo xconfig hyperv         # Microsoft Hyper-V guest
-
-# Fallback and recovery modes
-sudo xconfig vesa           # VESA compatible mode
-sudo xconfig scfb           # FreeBSD syscons framebuffer
-sudo xconfig safe           # Minimal recovery mode
-
-# Advanced configurations
-sudo xconfig dual           # Dual monitor template
+# or
+sudo xconfig manual
 ```
 
-### System Information
+Opens the bsddialog/dialog UI. Choices are built safely via `set --` (no fragile quoting).
+
+### Direct targets
+
 ```bash
-sudo xconfig debug
-```
-Displays comprehensive system information including:
-- FreeBSD version and hardware details
-- Available graphics drivers and packages
-- Current X11 configuration status
-- External configuration files availability
+# GPUs
+sudo xconfig nvidia         # Auto-detect the correct NVIDIA branch
+sudo xconfig intel          # Intel with external config template
+sudo xconfig intel-auto     # Intel auto (no config file)
+sudo xconfig amd            # Auto decide: amdgpu or radeonkms (based on device)
+sudo xconfig amdgpu         # Force amdgpu template
+sudo xconfig radeonkms      # Force radeonkms template
 
-## Configuration Files
+# Virtualization
+sudo xconfig virtualbox
+sudo xconfig vmware
+sudo xconfig qemu
+sudo xconfig hyperv
 
-The tool includes optimized X11 configuration files for each supported platform:
-
-| File | Purpose | Hardware/Platform |
-|------|---------|------------------|
-| `XF86Config.intel` | Intel graphics | i915kms driver with SNA acceleration |
-| `XF86Config.amdgpu` | Modern AMD | amdgpu driver with Glamor acceleration |
-| `XF86Config.radeonkms` | Legacy AMD | radeonkms driver for older cards |
-| `XF86Config.virtualbox` | VirtualBox | Guest additions integration |
-| `XF86Config.vmware` | VMware | VMware Tools compatibility |
-| `XF86Config.qemu` | QEMU/KVM | Cirrus graphics driver |
-| `XF86Config.hyperv` | Hyper-V | Microsoft virtualization platform |
-| `XF86Config.scfb` | FreeBSD native | Syscons framebuffer driver |
-| `XF86Config.vesa` | Universal | VESA compatible fallback |
-| `XF86Config.safe` | Recovery | Minimal troubleshooting config |
-| `XF86Config.dual` | Multi-monitor | Dual display template |
-
-## 🔧 Advanced Usage
-
-### Custom Driver Installation
-The tool supports GhostBSD's `/xdrivers` directory for offline driver packages:
-```bash
-# Tool automatically checks /xdrivers for packages
-# Falls back to pkg repository if not available
-sudo xconfig nvidia
-```
-
-### NVIDIA Driver Version Selection
-NVIDIA driver versions are automatically selected based on hardware:
-- **RTX 50/40/30 series**: nvidia-driver-580
-- **RTX 20/GTX 16 series**: nvidia-driver-470
-- **GTX 10/900 series**: nvidia-driver-390
-- **GTX 600-800 series**: nvidia-driver-340
-- **Legacy cards**: nvidia-driver-304
-
-## Troubleshooting
-
-### X11 Won't Start
-```bash
-# Try safe mode
+# Fallback / recovery
+sudo xconfig vesa
+sudo xconfig scfb
 sudo xconfig safe
 
-# Check logs
-tail -f /var/log/xconfig.log
-tail -f /var/log/Xorg.0.log
+# Advanced
+sudo xconfig dual           # Dual-monitor template
 ```
 
-### Graphics Performance Issues
-```bash
-# Verify correct driver is loaded
-kldstat | grep -E "(nvidia|amdgpu|radeonkms|i915kms)"
+### System Info / Debug
 
-# Check hardware detection
+```bash
 sudo xconfig debug
 ```
 
-## 📄 License
+Prints FreeBSD version, detected GPUs, candidate drivers, current Xorg status, presence of `/xdrivers`, and available config templates.
 
-This project is licensed under the BSD 2-Clause License - see the [LICENSE](LICENSE) file for details.
+---
+
+## External Configuration Files
+
+Place templates in either:
+
+* `$(dirname "$0")/cardDetect/` (development/portable), or
+* `/usr/local/etc/X11/cardDetect/` (system-wide)
+
+| File                    | Purpose                  |
+| ----------------------- | ------------------------ |
+| `XF86Config.intel`      | Intel (i915kms, tuned)   |
+| `XF86Config.amdgpu`     | Modern AMD (Glamor/DRI3) |
+| `XF86Config.radeonkms`  | Legacy AMD (DRI2)        |
+| `XF86Config.virtualbox` | VirtualBox               |
+| `XF86Config.vmware`     | VMware                   |
+| `XF86Config.qemu`       | QEMU/KVM                 |
+| `XF86Config.hyperv`     | Microsoft Hyper-V        |
+| `XF86Config.scfb`       | Syscons framebuffer      |
+| `XF86Config.vesa`       | Generic VESA             |
+| `XF86Config.safe`       | Minimal recovery         |
+| `XF86Config.dual`       | Dual-monitor starter     |
+
+> When a template is applied, the existing `/etc/X11/xorg.conf` is backed up to `/etc/X11/backup/xorg.conf.YYYYMMDD_HHMMSS`.
+
+---
+
+## NVIDIA Branch Selection (heuristic)
+
+The script classifies the device and selects an appropriate package branch:
+
+* Newer/modern: `nvidia-driver-580`
+* Previous gens: `nvidia-driver-470`
+* Older gens: `nvidia-driver-390`, `nvidia-driver-340`, `nvidia-driver-304`
+
+> Exact package names available on your system may vary; the script lists available `nvidia-driver-*` if installation fails.
+
+---
+
+## Offline Drivers (`/xdrivers`)
+
+If `/xdrivers/drivers-list` and corresponding `.pkg` files exist, `xconfig` installs from there first:
+
+```
+/xdrivers/drivers-list      # lines: "<pkgname> <filename.pkg>"
+/xdrivers/<filename.pkg>    # package payloads
+```
+
+Falls back to `pkg install` on failure.
+
+---
+
+## License
+
+BSD 2-Clause “Simplified” License — see [LICENSE](LICENSE).
 
