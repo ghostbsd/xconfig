@@ -46,7 +46,7 @@
 
 ```bash
 # Clone
-git clone https://github.com/yourusername/xconfig.git
+git clone https://github.com/GhostBSD/xconfig.git
 cd xconfig
 
 # Install the script
