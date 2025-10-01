@@ -1,4 +1,89 @@
+# FreeBSD SCFB (syscons framebuffer) xorg.conf file
+
+Section "ServerLayout"
+    Identifier     "SCFB Configured"
+    Screen      0  "Screen0" 0 0
+    InputDevice    "Mouse0" "CorePointer"
+    InputDevice    "Keyboard0" "CoreKeyboard"
+    Option         "AutoAddDevices" "Off"
+EndSection
+
+Section "Files"
+    ModulePath   "/usr/local/lib/modules"
+    ModulePath   "/usr/local/lib/xorg/modules"
+    FontPath     "/usr/local/share/fonts/misc/"
+    FontPath     "/usr/local/share/fonts/TTF/"
+    FontPath     "/usr/local/share/fonts/Type1/"
+    FontPath     "/usr/local/share/fonts/75dpi/"
+    FontPath     "/usr/local/share/fonts/100dpi/"
+    FontPath     "/usr/local/share/fonts/dejavu/"
+    FontPath     "/usr/local/share/fonts/TrueType/"
+EndSection
+
+Section "Module"
+    Load  "extmod"
+    Load  "record"
+    Load  "dbe"
+    Load  "glx"
+    Load  "dri"
+    Load  "dri2"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Keyboard0"
+    Driver      "kbd"
+    Option      "Protocol" "standard"
+    Option      "XkbRules" "xorg"
+    Option      "XkbModel" "pc105"
+    Option      "XkbLayout" "us"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Mouse0"
+    Driver      "mouse"
+    Option      "Protocol" "auto"
+    Option      "Device" "/dev/sysmouse"
+    Option      "ZAxisMapping" "4 5 6 7"
+EndSection
+
+Section "Monitor"
+    Identifier   "Monitor0"
+    VendorName   "Generic Monitor"
+    ModelName    "Generic"
+    HorizSync    28.0 - 78.0
+    VertRefresh  50.0 - 76.0
+    Option       "DPMS"
+    
+    # Common resolutions for SCFB
+    ModeLine "1024x768"   65.0 1024 1048 1184 1344    768  771  777  806 -hsync -vsync
+    ModeLine "800x600"    40.0  800  840  968 1056    600  601  605  628 +hsync +vsync
+    ModeLine "640x480"    25.2  640  656  752  800    480  490  492  525 -hsync -vsync
+EndSection
+
 Section "Device"
-	Identifier "Card0"
-	Driver     "scfb"
+    Identifier  "Card0"
+    Driver      "scfb"
+    Option      "ShadowFB" "true"
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Device     "Card0"
+    Monitor    "Monitor0"
+    DefaultDepth 24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     16
+        Modes    "1024x768" "800x600" "640x480"
+    EndSubSection
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+        Modes    "1024x768" "800x600" "640x480"
+    EndSubSection
+    SubSection "Display"
+        Viewport   0 0
+        Depth     32
+        Modes    "1024x768" "800x600" "640x480"
+    EndSubSection
 EndSection

@@ -1,0 +1,94 @@
+# Safe mode xorg.conf file for GhostBSD/FreeBSD
+# Minimal configuration for troubleshooting and recovery
+
+Section "ServerLayout"
+    Identifier     "Safe Mode"
+    Screen      0  "Screen0" 0 0
+    InputDevice    "Mouse0" "CorePointer"
+    InputDevice    "Keyboard0" "CoreKeyboard"
+    Option         "AutoAddDevices" "Off"
+    Option         "DontZap" "false"
+    Option         "DontZoom" "false"
+EndSection
+
+Section "ServerFlags"
+    Option         "DefaultServerLayout" "Safe Mode"
+    Option         "DontVTSwitch" "false"
+    Option         "AllowMouseOpenFail" "true"
+    Option         "PciForceNone" "false"
+    Option         "AutoEnableDevices" "false"
+    Option         "AutoAddDevices" "false"
+EndSection
+
+Section "Files"
+    ModulePath   "/usr/local/lib/xorg/modules"
+    FontPath     "/usr/local/share/fonts/misc/"
+    FontPath     "/usr/local/share/fonts/75dpi/"
+    FontPath     "/usr/local/share/fonts/100dpi/"
+EndSection
+
+Section "Module"
+    Load  "extmod"
+    Load  "dbe"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Keyboard0"
+    Driver      "kbd"
+    Option      "Protocol" "standard"
+    Option      "XkbRules" "base"
+    Option      "XkbModel" "pc104"
+    Option      "XkbLayout" "us"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Mouse0"
+    Driver      "mouse"
+    Option      "Protocol" "auto"
+    Option      "Device" "/dev/sysmouse"
+    Option      "Emulate3Buttons" "true"
+    Option      "Emulate3Timeout" "50"
+EndSection
+
+Section "Monitor"
+    Identifier   "Monitor0"
+    VendorName   "Unknown"
+    ModelName    "Safe Mode Monitor"
+    HorizSync    28.0 - 33.0
+    VertRefresh  43.0 - 72.0
+    
+    # Conservative 800x600 @ 60Hz
+    ModeLine "800x600" 40.0 800 840 968 1056 600 601 605 628 +hsync +vsync
+    # Safe 640x480 @ 60Hz
+    ModeLine "640x480" 25.2 640 656 752 800 480 490 492 525 -hsync -vsync
+EndSection
+
+Section "Device"
+    Identifier  "Card0"
+    Driver      "vesa"
+    Option      "ShadowFB" "true"
+    Option      "DefaultRefresh" "60"
+    VideoRam    4096
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Device     "Card0"
+    Monitor    "Monitor0"
+    DefaultDepth 16
+    SubSection "Display"
+        Viewport   0 0
+        Depth     8
+        Modes    "800x600" "640x480"
+    EndSubSection
+    SubSection "Display"
+        Viewport   0 0
+        Depth     16
+        Modes    "800x600" "640x480"
+    EndSubSection
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+        Modes    "800x600" "640x480"
+    EndSubSection
+EndSection

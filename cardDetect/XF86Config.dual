@@ -1,0 +1,154 @@
+# Dual monitor xorg.conf template for GhostBSD/FreeBSD
+# Configure for side-by-side monitor setup
+
+Section "ServerLayout"
+    Identifier     "Dual Monitor Setup"
+    Screen      0  "Screen0" 0 0
+    Screen      1  "Screen1" RightOf "Screen0"
+    InputDevice    "Mouse0" "CorePointer"
+    InputDevice    "Keyboard0" "CoreKeyboard"
+    Option         "Xinerama" "true"
+    Option         "AutoAddDevices" "Off"
+EndSection
+
+Section "Files"
+    ModulePath   "/usr/local/lib/modules"
+    ModulePath   "/usr/local/lib/xorg/modules"
+    FontPath     "/usr/local/share/fonts/misc/"
+    FontPath     "/usr/local/share/fonts/TTF/"
+    FontPath     "/usr/local/share/fonts/Type1/"
+    FontPath     "/usr/local/share/fonts/75dpi/"
+    FontPath     "/usr/local/share/fonts/100dpi/"
+    FontPath     "/usr/local/share/fonts/dejavu/"
+    FontPath     "/usr/local/share/fonts/TrueType/"
+EndSection
+
+Section "Module"
+    Load  "extmod"
+    Load  "record"
+    Load  "dbe"
+    Load  "glx"
+    Load  "dri"
+    Load  "dri2"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Keyboard0"
+    Driver      "kbd"
+    Option      "Protocol" "standard"
+    Option      "XkbRules" "xorg"
+    Option      "XkbModel" "pc105"
+    Option      "XkbLayout" "us"
+EndSection
+
+Section "InputDevice"
+    Identifier  "Mouse0"
+    Driver      "mouse"
+    Option      "Protocol" "auto"
+    Option      "Device" "/dev/sysmouse"
+    Option      "ZAxisMapping" "4 5 6 7"
+EndSection
+
+Section "Monitor"
+    Identifier   "Monitor0"
+    VendorName   "Generic Monitor"
+    ModelName    "Primary Monitor"
+    HorizSync    28.0 - 96.0
+    VertRefresh  50.0 - 75.0
+    Option       "DPMS"
+    Option       "Primary" "true"
+EndSection
+
+Section "Monitor"
+    Identifier   "Monitor1"
+    VendorName   "Generic Monitor"
+    ModelName    "Secondary Monitor"
+    HorizSync    28.0 - 96.0
+    VertRefresh  50.0 - 75.0
+    Option       "DPMS"
+EndSection
+
+Section "Device"
+    Identifier  "Card0"
+    Driver      "intel"
+    Screen      0
+    Option      "AccelMethod" "sna"
+    Option      "TearFree" "true"
+    Option      "DRI" "3"
+    Option      "Monitor-VGA1" "Monitor0"
+    Option      "Monitor-HDMI1" "Monitor1"
+EndSection
+
+Section "Device"
+    Identifier  "Card1"
+    Driver      "intel"
+    Screen      1
+    Option      "AccelMethod" "sna"
+    Option      "TearFree" "true"
+    Option      "DRI" "3"
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Device     "Card0"
+    Monitor    "Monitor0"
+    DefaultDepth 24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+        Modes    "1920x1080" "1680x1050" "1600x1200" "1280x1024" "1024x768"
+        Virtual   3840 1080
+    EndSubSection
+EndSection
+
+Section "Screen"
+    Identifier "Screen1"
+    Device     "Card1"
+    Monitor    "Monitor1"
+    DefaultDepth 24
+    SubSection "Display"
+        Viewport   0 0
+        Depth     24
+        Modes    "1920x1080" "1680x1050" "1600x1200" "1280x1024" "1024x768"
+    EndSubSection
+EndSection
+
+Section "DRI"
+    Mode 0666
+EndSection
+
+# Alternative single-card dual-output configuration
+# Uncomment and modify the sections below if using one graphics card with two outputs
+#
+# Section "Device"
+#     Identifier  "Card0"
+#     Driver      "intel"  # or "amdgpu", "radeon", "nvidia"
+#     Option      "AccelMethod" "sna"
+#     Option      "TearFree" "true"
+#     Option      "DRI" "3"
+#     Option      "ZaphodHeads" "VGA1,HDMI1"  # Adjust output names as needed
+# EndSection
+#
+# Section "Screen"
+#     Identifier "Screen0"
+#     Device     "Card0"
+#     Monitor    "Monitor0"
+#     DefaultDepth 24
+#     SubSection "Display"
+#         Viewport   0 0
+#         Depth     24
+#         Modes    "1920x1080" "1680x1050" "1600x1200" "1280x1024" "1024x768"
+#     EndSubSection
+# EndSection
+#
+# Section "Screen"
+#     Identifier "Screen1"
+#     Device     "Card0"
+#     Monitor    "Monitor1"
+#     DefaultDepth 24
+#     SubSection "Display"
+#         Viewport   0 0
+#         Depth     24
+#         Modes    "1920x1080" "1680x1050" "1600x1200" "1280x1024" "1024x768"
+#     EndSubSection
+# EndSection
