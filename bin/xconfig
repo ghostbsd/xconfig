@@ -370,7 +370,7 @@ setup_nvidia() {
     info "Setting up NVIDIA driver: $driver_type"
 
     case "$driver_type" in
-        nvidia-latest) pkg_name="nvidia-driver-580"; module_name="nvidia-modeset" ;;
+        nvidia-latest) pkg_name="nvidia-driver"; module_name="nvidia-modeset" ;;
         nvidia-470)    pkg_name="nvidia-driver-470"; module_name="nvidia-modeset" ;;
         nvidia-390)    pkg_name="nvidia-driver-390"; module_name="nvidia-modeset" ;;
         nvidia-340)    pkg_name="nvidia-driver-340"; module_name="nvidia" ;;
