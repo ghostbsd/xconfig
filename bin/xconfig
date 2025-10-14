@@ -25,6 +25,23 @@ info()  { log "INFO"  "$@"; }
 warn()  { log "WARN"  "$@"; }
 error() { log "ERROR" "$@"; echo "Error: $*" >&2; }
 
+# Detect X server implementation (XLibre vs Xorg)
+detect_x_server() {
+    local x_server="unknown"
+    
+    if command -v Xorg >/dev/null 2>&1; then
+        local version_output
+        version_output=$(Xorg -version 2>&1)
+        if echo "$version_output" | grep -q "XLibre X Server"; then
+            x_server="xlibre"
+        elif echo "$version_output" | grep -q "X.Org X Server"; then
+            x_server="xorg"
+        fi
+    fi
+    
+    echo "$x_server"
+}
+
 # Check root privileges and setup environment
 check_environment() {
     if [ "$(id -u)" != 0 ]; then
@@ -35,6 +52,9 @@ check_environment() {
     info "Starting $SCRIPT_NAME (PID: $$)"
     info "Script directory: $SCRIPT_DIR"
     info "Config directory: $CONFIG_DIR"
+    
+    local x_server; x_server=$(detect_x_server)
+    info "Detected X server: $x_server"
 }
 
 # Apply external configuration file
@@ -305,22 +325,32 @@ load_nvidia_module() {
 
 # Install NVIDIA driver
 install_nvidia_driver() {
-    local pkg_name="$1"
-    if pkg info "$pkg_name" >/dev/null 2>&1; then
-        info "NVIDIA driver $pkg_name already installed"; return 0; fi
+    local pkg_name="$1" actual_pkg_name x_server
+    
+    # Detect X server and adjust package name if needed
+    x_server=$(detect_x_server)
+    if [ "$x_server" = "xlibre" ]; then
+        actual_pkg_name="xlibre-$pkg_name"
+        info "XLibre detected, using package: $actual_pkg_name"
+    else
+        actual_pkg_name="$pkg_name"
+    fi
+    
+    if pkg info "$actual_pkg_name" >/dev/null 2>&1; then
+        info "NVIDIA driver $actual_pkg_name already installed"; return 0; fi
     ensure_linux_compatibility
     if [ -d "/xdrivers" ] && [ -f "/xdrivers/drivers-list" ]; then
         local driver_file
-        driver_file=$(grep "^$pkg_name " /xdrivers/drivers-list 2>/dev/null | cut -d' ' -f2)
+        driver_file=$(grep "^$actual_pkg_name " /xdrivers/drivers-list 2>/dev/null | cut -d' ' -f2)
         if [ -n "$driver_file" ] && [ -f "/xdrivers/$driver_file" ]; then
-            info "Installing $pkg_name from /xdrivers"
+            info "Installing $actual_pkg_name from /xdrivers"
             if pkg add "/xdrivers/$driver_file"; then return 0; else warn "Failed to install from /xdrivers, trying repository"; fi
         fi
     fi
-    info "Installing $pkg_name from repository"
-    if pkg install -y "$pkg_name"; then info "Successfully installed $pkg_name"; return 0; fi
-    error "Failed to install $pkg_name"
-    error "Available NVIDIA drivers:"; pkg search "^nvidia-driver-" 2>/dev/null | while read -r line; do error "  $line"; done
+    info "Installing $actual_pkg_name from repository"
+    if pkg install -y "$actual_pkg_name"; then info "Successfully installed $actual_pkg_name"; return 0; fi
+    error "Failed to install $actual_pkg_name"
+    error "Available NVIDIA drivers:"; pkg search "^nvidia-driver-\|^xlibre-nvidia-driver-" 2>/dev/null | while read -r line; do error "  $line"; done
     return 1
 }
 
