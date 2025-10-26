@@ -1,7 +1,12 @@
+# Xorg config for AMD Kaveri / Radeon R5 (using modesetting DDX)
+# Minimal, modern configuration for radeonkms with DRI3 acceleration
+# Path: cardDetect/XF86Config.kaveri
+
 Section "Device"
     Identifier  "AMD Kaveri (modesetting)"
     Driver      "modesetting"
     Option      "AccelMethod" "glamor"
     Option      "DRI" "3"
-    # BusID "PCI:1:0:0"
+    # Optional: set BusID if X binds the wrong GPU
+    # BusID     "PCI:1:0:0"
 EndSection
