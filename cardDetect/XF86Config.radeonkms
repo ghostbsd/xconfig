@@ -1,92 +1,38 @@
-# AMD Radeon KMS graphics xorg.conf file for GhostBSD/FreeBSD
-# For legacy AMD/ATI Radeon graphics cards with radeonkms kernel module
-
-Section "ServerLayout"
-    Identifier     "RadeonKMS Configured"
-    Screen      0  "Screen0" 0 0
-    InputDevice    "Mouse0" "CorePointer"
-    InputDevice    "Keyboard0" "CoreKeyboard"
-    Option         "AutoAddDevices" "Off"
-EndSection
-
-Section "Files"
-    ModulePath   "/usr/local/lib/modules"
-    ModulePath   "/usr/local/lib/xorg/modules"
-    FontPath     "/usr/local/share/fonts/misc/"
-    FontPath     "/usr/local/share/fonts/TTF/"
-    FontPath     "/usr/local/share/fonts/Type1/"
-    FontPath     "/usr/local/share/fonts/75dpi/"
-    FontPath     "/usr/local/share/fonts/100dpi/"
-    FontPath     "/usr/local/share/fonts/dejavu/"
-    FontPath     "/usr/local/share/fonts/TrueType/"
-EndSection
-
-Section "Module"
-    Load  "extmod"
-    Load  "record"
-    Load  "dbe"
-    Load  "glx"
-    Load  "dri"
-    Load  "dri2"
-EndSection
-
-Section "InputDevice"
-    Identifier  "Keyboard0"
-    Driver      "kbd"
-    Option      "Protocol" "standard"
-    Option      "XkbRules" "xorg"
-    Option      "XkbModel" "pc105"
-    Option      "XkbLayout" "us"
-EndSection
-
-Section "InputDevice"
-    Identifier  "Mouse0"
-    Driver      "mouse"
-    Option      "Protocol" "auto"
-    Option      "Device" "/dev/sysmouse"
-    Option      "ZAxisMapping" "4 5 6 7"
-EndSection
-
-Section "Monitor"
-    Identifier   "Monitor0"
-    VendorName   "Generic Monitor"
-    ModelName    "AMD Radeon Monitor"
-    HorizSync    28.0 - 96.0
-    VertRefresh  50.0 - 75.0
-    Option       "DPMS"
-EndSection
+# AMD Radeon KMS (radeonkms) — modern Xorg config for GhostBSD/FreeBSD
+# Minimal, EDID-driven, DRI3 + TearFree, libinput for input
 
 Section "Device"
-    Identifier  "Card0"
+    Identifier  "AMD Radeon (radeon DDX)"
     Driver      "radeon"
-    Option      "AccelMethod" "glamor"
-    Option      "DRI" "2"
-    Option      "ColorTiling" "true"
+    # Acceleration & present
+    Option      "AccelMethod" "glamor"     # use glamor with KMS
+    Option      "DRI" "3"                  # DRI3 improves latency
+    Option      "TearFree" "on"            # basic tear mitigation
     Option      "EnablePageFlip" "true"
+    Option      "ColorTiling" "on"
+    # Optional: set BusID if X binds the wrong GPU (see pciconf -lv)
+    # BusID     "PCI:1:0:0"
 EndSection
 
 Section "Screen"
-    Identifier "Screen0"
-    Device     "Card0"
-    Monitor    "Monitor0"
+    Identifier  "Screen0"
+    Device      "AMD Radeon (radeon DDX)"
     DefaultDepth 24
     SubSection "Display"
-        Viewport   0 0
-        Depth     16
-        Modes    "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768" "800x600"
-    EndSubSection
-    SubSection "Display"
-        Viewport   0 0
-        Depth     24
-        Modes    "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768" "800x600"
-    EndSubSection
-    SubSection "Display"
-        Viewport   0 0
-        Depth     32
-        Modes    "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768" "800x600"
+        Depth 24
+        # Do NOT force modelines; let EDID pick native mode
     EndSubSection
 EndSection
 
-Section "DRI"
-    Mode 0666
+# libinput handles keyboards & mice (no legacy InputDevice stanzas)
+Section "InputClass"
+    Identifier "libinput pointer"
+    MatchIsPointer "on"
+    Driver "libinput"
+EndSection
+
+Section "InputClass"
+    Identifier "libinput keyboard"
+    MatchIsKeyboard "on"
+    Driver "libinput"
 EndSection
