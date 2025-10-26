@@ -1,0 +1,7 @@
+Section "Device"
+    Identifier  "AMD Kaveri (modesetting)"
+    Driver      "modesetting"
+    Option      "AccelMethod" "glamor"
+    Option      "DRI" "3"
+    # BusID "PCI:1:0:0"
+EndSection
