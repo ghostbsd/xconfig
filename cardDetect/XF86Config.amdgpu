@@ -74,17 +74,17 @@ Section "Screen"
     SubSection "Display"
         Viewport   0 0
         Depth     16
-        Modes    "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
+        Modes    "5120x2880" "5120x1440" "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
     EndSubSection
     SubSection "Display"
         Viewport   0 0
         Depth     24
-        Modes    "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
+        Modes    "5120x2880" "5120x1440" "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
     EndSubSection
     SubSection "Display"
         Viewport   0 0
         Depth     32
-        Modes    "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
+        Modes    "5120x2880" "5120x1440" "2560x1440" "1920x1080" "1680x1050" "1600x1200" "1400x1050" "1280x1024" "1024x768"
     EndSubSection
 EndSection
 
