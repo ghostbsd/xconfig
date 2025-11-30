@@ -1,0 +1,52 @@
+# XF86Config.bhyve - bhyve guest using scfb
+#
+# This template is intentionally conservative.
+# It uses the scfb driver with a wide sync range so it works across most
+# bhyve display setups.
+
+Section "ServerLayout"
+    Identifier     "Layout0"
+    Screen         "Screen0"
+EndSection
+
+Section "Files"
+    ModulePath   "/usr/local/lib/xorg/modules"
+    FontPath     "/usr/local/share/fonts/dejavu"
+    FontPath     "/usr/local/share/fonts/TTF"
+    FontPath     "/usr/local/share/fonts"
+EndSection
+
+Section "Module"
+    Load  "dbe"
+    Load  "extmod"
+    Load  "freetype"
+EndSection
+
+Section "Monitor"
+    Identifier   "Monitor0"
+    VendorName   "Generic"
+    ModelName    "bhyve Display"
+    HorizSync    30.0 - 90.0
+    VertRefresh  50.0 - 75.0
+    Option       "DPMS"
+EndSection
+
+Section "Device"
+    Identifier  "Card0"
+    Driver      "scfb"
+    VendorName  "Generic"
+    BoardName   "bhyve framebuffer"
+    Option      "ShadowFB" "true"
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Device     "Card0"
+    Monitor    "Monitor0"
+    DefaultDepth 24
+
+    SubSection "Display"
+        Depth     24
+        Modes    "1920x1080" "1600x900" "1366x768" "1280x1024" "1280x720" "1024x768"
+    EndSubSection
+EndSection
