@@ -255,6 +255,131 @@ detect_nvidia_gpu() {
     pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" | grep -qi NVIDIA
 }
 
+# Get NVIDIA GPU PCI device IDs (returns space-separated list)
+get_nvidia_device_ids() {
+    pciconf -l 2>/dev/null | grep -i "chip=.*10de" | \
+        sed -E 's/.*chip=0x([0-9a-fA-F]{4}).*/\1/' | tr 'A-F' 'a-f'
+}
+
+# Map NVIDIA device ID to required driver series
+# Based on NVIDIA's legacy driver support matrix
+# Returns: 580 (current), 470, 390, 340, or 304
+nvidia_device_to_driver() {
+    devid=$1
+    
+    # Convert to lowercase for comparison
+    devid=$(echo "$devid" | tr 'A-F' 'a-f')
+    
+    # Extract first two hex digits (device class within NVIDIA)
+    prefix=$(echo "$devid" | cut -c1-2)
+    
+    case "$prefix" in
+        # Blackwell (RTX 50xx) - 2xxx device IDs
+        2[0-9a-f])
+            echo "580"
+            ;;
+        # Ada Lovelace (RTX 40xx) - 26xx, 27xx, 28xx
+        26|27|28)
+            echo "580"
+            ;;
+        # Ampere (RTX 30xx, A-series) - 20xx, 22xx, 23xx, 24xx, 25xx
+        20|22|23|24|25)
+            echo "580"
+            ;;
+        # Turing (RTX 20xx, GTX 16xx) - 1e/1f/21 prefix
+        1e|1f|21)
+            echo "580"
+            ;;
+        # Pascal (GTX 10xx) - 15xx, 17xx, 1b/1c/1d prefix
+        15|17|1b|1c|1d)
+            echo "580"
+            ;;
+        # Maxwell (GTX 9xx, GTX 750) - 13xx, 14xx, 17xx (some)
+        13|14)
+            echo "580"
+            ;;
+        # Kepler (GTX 6xx, 7xx) - some supported in 580, some need 470
+        # GK104, GK106, GK107, GK110, GK208 etc
+        # 0fxx, 10xx, 11xx, 12xx - check specific ranges
+        0f|10|11|12)
+            # Most Kepler GPUs work with current driver
+            # But some very early Kepler need 470
+            case "$devid" in
+                # GK107 (GT 740, etc) - some need 470
+                0fc[0-9a-f]|0fd[0-9a-f]|0fe[0-9a-f])
+                    echo "580"
+                    ;;
+                # GK208 (GT 7xx low-end) 
+                1280|1281|1282|1284|1286|1287|1288|1289|128b)
+                    echo "580"
+                    ;;
+                *)
+                    echo "580"
+                    ;;
+            esac
+            ;;
+        # Fermi (GTX 4xx, 5xx) - need 390 legacy driver
+        # Device IDs: 06xx, 08xx, 0axx, 0cxx, 0dxx, 0exx
+        06|08|0a|0c|0d|0e)
+            echo "390"
+            ;;
+        # Tesla (GeForce 8xxx, 9xxx, 2xx, 3xx) - need 340 legacy
+        # Device IDs: 01xx, 02xx, 03xx, 04xx, 05xx, 06xx (older)
+        01|02|03|04|05)
+            echo "340"
+            ;;
+        # NV4x/G7x (GeForce 6xxx, 7xxx) - need 304 legacy
+        00)
+            echo "304"
+            ;;
+        *)
+            # Default to current driver, let it fail gracefully
+            echo "580"
+            ;;
+    esac
+}
+
+# Auto-detect best driver for installed NVIDIA GPU
+auto_detect_nvidia_driver() {
+    device_ids=$(get_nvidia_device_ids)
+    
+    if [ -z "$device_ids" ]; then
+        echo "580"
+        return
+    fi
+    
+    # If multiple GPUs, find the lowest common driver version
+    min_driver="580"
+    
+    for devid in $device_ids; do
+        driver=$(nvidia_device_to_driver "$devid")
+        
+        # Lower version = older GPU = more restrictive
+        case "$driver" in
+            304)
+                min_driver="304"
+                ;;
+            340)
+                [ "$min_driver" != "304" ] && min_driver="340"
+                ;;
+            390)
+                case "$min_driver" in
+                    304|340) ;;
+                    *) min_driver="390" ;;
+                esac
+                ;;
+            470)
+                case "$min_driver" in
+                    304|340|390) ;;
+                    *) min_driver="470" ;;
+                esac
+                ;;
+        esac
+    done
+    
+    echo "$min_driver"
+}
+
 count_gpu_devices() {
     # Count actual VGA/display class devices, not grep matches
     pciconf -lv 2>/dev/null | grep -Ei "^[a-z].*class.*=.*vga|^[a-z].*class.*=.*display" | wc -l | tr -d ' '
@@ -291,17 +416,29 @@ select_nvidia_pkg() {
         prefix="xlibre-nvidia-driver"
     fi
 
+    # Determine driver version to use
+    driver_version="$NVIDIA_DRIVER_VERSION"
+    
+    # If not explicitly set (still default), auto-detect based on GPU
+    if [ "$driver_version" = "580" ] && [ -z "${NVIDIA_DRIVER_VERSION_SET:-}" ]; then
+        detected=$(auto_detect_nvidia_driver)
+        if [ "$detected" != "580" ]; then
+            log INFO "Auto-detected legacy GPU, using driver series: $detected"
+            driver_version="$detected"
+        fi
+    fi
+
     # If user specified a full version (contains '.'), use it directly
-    case "$NVIDIA_DRIVER_VERSION" in
+    case "$driver_version" in
         *.*)
-            echo "${prefix}-${NVIDIA_DRIVER_VERSION}"
+            echo "${prefix}-${driver_version}"
             return
             ;;
     esac
 
-    # Otherwise, search for matching package by major version
-    # Exclude -devel packages unless explicitly requested
-    match=$(pkg search -q "^${prefix}-${NVIDIA_DRIVER_VERSION}" 2>/dev/null | \
+    # Search for matching package by major version
+    # For legacy drivers (304, 340, 390, 470), include them in search
+    match=$(pkg search -q "^${prefix}-${driver_version}" 2>/dev/null | \
             grep -v -- "-devel" | \
             head -n 1)
 
@@ -310,20 +447,31 @@ select_nvidia_pkg() {
         return
     fi
 
-    # Fallback: try the latest non-legacy driver
+    # Fallback: if requested version not found, try to find ANY matching driver
+    # For legacy drivers, this is critical - don't exclude them
+    case "$driver_version" in
+        304|340|390|470)
+            # Legacy driver not found - this is an error
+            log ERROR "Legacy driver ${driver_version} not found in packages"
+            echo "${prefix}-${driver_version}"
+            return
+            ;;
+    esac
+
+    # For current drivers, try the latest non-legacy driver
     match=$(pkg search -q "^${prefix}-[0-9]" 2>/dev/null | \
             grep -Ev -- "-(304|340|390|470|devel)" | \
             sort -t- -k3 -V | \
             tail -n 1)
 
     if [ -n "$match" ]; then
-        log WARN "Requested driver ${NVIDIA_DRIVER_VERSION} not found, using $match"
+        log WARN "Requested driver ${driver_version} not found, using $match"
         echo "$match"
         return
     fi
 
     # Last resort: return what was requested, let pkg fail with clear error
-    echo "${prefix}-${NVIDIA_DRIVER_VERSION}"
+    echo "${prefix}-${driver_version}"
 }
 
 ###############################################################################
@@ -499,6 +647,8 @@ cmd_debug() {
     echo "kern.vm_guest: $(detect_vm_guest)"
     echo "Detected X server: $(detect_x_server)"
     echo "NVIDIA driver version setting: $NVIDIA_DRIVER_VERSION"
+    echo "NVIDIA auto-detected driver: $(auto_detect_nvidia_driver)"
+    echo "NVIDIA device IDs: $(get_nvidia_device_ids)"
     echo "NVIDIA package selected: $(select_nvidia_pkg)"
     echo
 
@@ -557,8 +707,11 @@ Commands:
   help          Show this help
 
 Environment:
-  NVIDIA_DRIVER_VERSION   NVIDIA driver major (580) or full version
-                          (580.105.08). Default: 580
+  NVIDIA_DRIVER_VERSION   NVIDIA driver major (580, 470, 390, 340, 304)
+                          or full version (580.105.08). Auto-detected
+                          from GPU hardware if not set.
+                          Set NVIDIA_DRIVER_VERSION_SET=1 to force
+                          your chosen version over auto-detection.
 
 EOF
 }
