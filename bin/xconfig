@@ -252,13 +252,16 @@ detect_amd_gpu() {
 }
 
 detect_nvidia_gpu() {
-    pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" | grep -qi NVIDIA
+    # Check VGA, display, AND 3D controller classes
+    # Many NVIDIA dGPUs (especially in laptops/servers) register as 3D controller
+    pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display|3d" | grep -qi NVIDIA
 }
 
 # Get NVIDIA GPU PCI device IDs (returns space-separated list)
+# Includes VGA, display, and 3D controller class devices
 get_nvidia_device_ids() {
     pciconf -l 2>/dev/null | grep -i "chip=.*10de" | \
-        sed -E 's/.*chip=0x([0-9a-fA-F]{4}).*/\1/' | tr 'A-F' 'a-f'
+        sed -E 's/.*chip=0x([0-9a-fA-F]{4}).*/\1/' | tr 'A-F' 'a-f' | sort -u
 }
 
 # Map NVIDIA device ID to required driver series
@@ -270,70 +273,148 @@ nvidia_device_to_driver() {
     # Convert to lowercase for comparison
     devid=$(echo "$devid" | tr 'A-F' 'a-f')
     
+    # First, check explicit device ID table for known edge cases
+    # This catches GPUs that don't fit neat prefix patterns
+    case "$devid" in
+        # ===== 304.xx legacy (NV4x/G7x: GeForce 6xxx, 7xxx) =====
+        # These are GeForce 6/7 series from ~2004-2006
+        0040|0041|0042|0043|0044|0045|0046|0047|0048|004e) echo "304"; return ;;
+        0090|0091|0092|0093|0095|0098|0099|009d) echo "304"; return ;;
+        00c0|00c1|00c2|00c3|00c8|00c9|00cc|00cd|00ce) echo "304"; return ;;
+        00f1|00f2|00f3|00f4|00f5|00f6|00f8|00f9) echo "304"; return ;;
+        0140|0141|0142|0143|0144|0145|0146|0147|0148|0149|014a|014c|014d|014e|014f) echo "304"; return ;;
+        0160|0161|0162|0163|0164|0165|0166|0167|0168|0169|016a) echo "304"; return ;;
+        0191|0193|0194|0197) echo "304"; return ;;
+        01d0|01d1|01d2|01d3|01d6|01d7|01d8|01da|01db|01dc|01dd|01de|01df) echo "304"; return ;;
+        0211|0212|0215|0218|021a|021b) echo "304"; return ;;
+        0221|0222|0240|0241|0242|0244|0245|0247|0248) echo "304"; return ;;
+        0290|0291|0292|0293|0294|0295|0297|0298|0299) echo "304"; return ;;
+        029a|029b|029c|029d|029e|029f) echo "304"; return ;;
+        02e0|02e1|02e2|02e3|02e4) echo "304"; return ;;
+        0390|0391|0392|0393|0394|0395|0397|0398|0399|039c|039e) echo "304"; return ;;
+        03d0|03d1|03d2|03d5|03d6) echo "304"; return ;;
+        
+        # ===== 340.xx legacy (Tesla: GeForce 8xxx, 9xxx, 1xx, 2xx, 3xx) =====
+        # Tesla architecture ~2006-2010
+        0400|0401|0402|0403|0404|0405|0406|0407|0408|0409|0410) echo "340"; return ;;
+        0420|0421|0422|0423|0424|0425|0426|0427|0428|0429|042a|042b|042c|042d|042e|042f) echo "340"; return ;;
+        05e0|05e1|05e2|05e3|05e6|05e7|05ea|05eb|05ed|05f8|05f9|05fd|05fe|05ff) echo "340"; return ;;
+        0600|0601|0602|0603|0604|0605|0606|0607|0608|0609|060a|060b|060c|060d|060f) echo "340"; return ;;
+        0610|0611|0612|0613|0614|0615|0617|0618|0619|061a|061b|061c|061d|061e|061f) echo "340"; return ;;
+        0620|0621|0622|0623|0625|0626|0627|0628|062a|062b|062c|062d|062e) echo "340"; return ;;
+        0630|0631|0632|0635|0637|0638|063a) echo "340"; return ;;
+        0640|0641|0643|0644|0645|0646|0647|0648|0649|064a|064b|064c) echo "340"; return ;;
+        0651|0652|0653|0654|0655|0656|0658|0659|065a|065b|065c|065f) echo "340"; return ;;
+        06c0|06c4|06ca|06cb|06cd|06d1|06d2|06d8|06d9|06da|06dc|06dd|06de|06df) echo "340"; return ;;
+        06e0|06e1|06e2|06e3|06e4|06e5|06e6|06e7|06e8|06e9|06ea|06eb|06ec|06ef) echo "340"; return ;;
+        06f1|06f8|06f9|06fa|06fb|06fd|06ff) echo "340"; return ;;
+        0840|0844|0845|0846|0847|0848|0849|084a|084b|084c|084d|084f) echo "340"; return ;;
+        0860|0861|0862|0863|0864|0865|0866|0867|0868|0869|086a|086c|086d|086e|086f) echo "340"; return ;;
+        0870|0871|0872|0873|0874|0876) echo "340"; return ;;
+        087d|087e|087f) echo "340"; return ;;
+        0a20|0a22|0a23|0a26|0a27|0a28|0a29|0a2a|0a2b|0a2c|0a2d) echo "340"; return ;;
+        0a30|0a32|0a34|0a35|0a38|0a3c) echo "340"; return ;;
+        0a60|0a62|0a63|0a64|0a65|0a66|0a67|0a68|0a69|0a6a|0a6c|0a6e|0a6f) echo "340"; return ;;
+        0a70|0a71|0a72|0a73|0a74|0a75|0a76|0a78|0a7a|0a7c) echo "340"; return ;;
+        0ca0|0ca2|0ca3|0ca4|0ca5|0ca7|0ca8|0ca9|0cac|0caf) echo "340"; return ;;
+        0cb0|0cb1) echo "340"; return ;;
+        
+        # ===== 390.xx legacy (Fermi: GeForce 4xx, 5xx, 6xx low-end) =====
+        # Fermi architecture ~2010-2012
+        06c0|06c4|06ca|06cb|06cd|06d1|06d2|06d8|06d9|06da|06dc|06dd|06de|06df) echo "390"; return ;;
+        0dc0|0dc4|0dc5|0dc6|0dcd|0dce) echo "390"; return ;;
+        0dd1|0dd2|0dd3|0dd6|0dd8|0dda) echo "390"; return ;;
+        0de0|0de1|0de2|0de3|0de4|0de5|0de7|0de8|0de9|0dea|0deb|0dec|0ded|0dee|0def) echo "390"; return ;;
+        0df0|0df1|0df2|0df3|0df4|0df5|0df6|0df7|0df8|0df9|0dfa|0dfc) echo "390"; return ;;
+        0e22|0e23|0e24|0e30|0e31|0e3a|0e3b) echo "390"; return ;;
+        1040|1042|1048|1049|104a|104b|104c) echo "390"; return ;;
+        1050|1051|1052|1054|1055|1056|1057|1058|1059|105a|105b) echo "390"; return ;;
+        107c|107d) echo "390"; return ;;
+        1080|1081|1082|1084|1086|1087|1088|1089|108b|108e) echo "390"; return ;;
+        1091|1094|1096|109a|109b) echo "390"; return ;;
+        10c0|10c3|10c5|10d8) echo "390"; return ;;
+        1180|1183|1184|1185|1187|1188|1189|118a|118e|118f) echo "390"; return ;;
+        1193|1194|1195|1198|1199|119a|119d|119e|119f) echo "390"; return ;;
+        11a0|11a1|11a2|11a3|11a7) echo "390"; return ;;
+        11b4|11b6|11b7|11b8|11ba|11bc|11bd|11be|11bf) echo "390"; return ;;
+        11c0|11c2|11c3|11c4|11c5|11c6|11c8) echo "390"; return ;;
+        
+        # ===== 470.xx legacy (Kepler: early GK1xx) =====
+        # Some Kepler devices dropped from 535+ driver
+        0fc0|0fc1|0fc2|0fc5|0fc6|0fc8|0fc9|0fcd|0fce|0fd1|0fd2) echo "470"; return ;;
+        0fd3|0fd4|0fd5|0fd8|0fd9|0fdf) echo "470"; return ;;
+        0fe0|0fe1|0fe2|0fe3|0fe4|0fe9|0fea|0fec|0fed|0fee|0fef|0ff2) echo "470"; return ;;
+        0ff3|0ff6|0ff8|0ff9|0ffa|0ffb|0ffc|0ffd|0ffe|0fff) echo "470"; return ;;
+        1001|1004|1005|1007|1008|100a|100c|101e|101f) echo "470"; return ;;
+        1021|1022|1023|1024|1026|1027|1028|102a|102d|103a|103c) echo "470"; return ;;
+        1200|1201|1203|1205|1206|1207|1208|1210|1211|1212|1213) echo "470"; return ;;
+    esac
+    
+    # If not in explicit table, fall back to prefix-based matching
     # Extract first two hex digits (device class within NVIDIA)
     prefix=$(echo "$devid" | cut -c1-2)
     
     case "$prefix" in
-        # Blackwell (RTX 50xx) - 2xxx device IDs
-        2[0-9a-f])
+        # ===== Current driver (580) =====
+        # Blackwell (RTX 50xx) - 2bxx, 2cxx
+        2b|2c)
             echo "580"
             ;;
         # Ada Lovelace (RTX 40xx) - 26xx, 27xx, 28xx
         26|27|28)
             echo "580"
             ;;
-        # Ampere (RTX 30xx, A-series) - 20xx, 22xx, 23xx, 24xx, 25xx
-        20|22|23|24|25)
+        # Hopper (H100, etc) - 23xx (data center)
+        23)
             echo "580"
             ;;
-        # Turing (RTX 20xx, GTX 16xx) - 1e/1f/21 prefix
+        # Ampere (RTX 30xx, A-series) - 20xx, 22xx, 24xx, 25xx
+        20|22|24|25)
+            echo "580"
+            ;;
+        # Turing (RTX 20xx, GTX 16xx) - 1exx, 1fxx, 21xx
         1e|1f|21)
             echo "580"
             ;;
-        # Pascal (GTX 10xx) - 15xx, 17xx, 1b/1c/1d prefix
-        15|17|1b|1c|1d)
+        # Volta (Titan V, Quadro GV100) - 1dxx
+        1d)
             echo "580"
             ;;
-        # Maxwell (GTX 9xx, GTX 750) - 13xx, 14xx, 17xx (some)
+        # Pascal (GTX 10xx) - 15xx, 17xx, 1bxx, 1cxx
+        15|17|1b|1c)
+            echo "580"
+            ;;
+        # Maxwell (GTX 9xx, GTX 750 Ti) - 13xx, 14xx, 17xx (some)
         13|14)
             echo "580"
             ;;
-        # Kepler (GTX 6xx, 7xx) - some supported in 580, some need 470
-        # GK104, GK106, GK107, GK110, GK208 etc
-        # 0fxx, 10xx, 11xx, 12xx - check specific ranges
+        # Kepler (GTX 6xx, 7xx) - remaining devices not in 470 list
+        # GK104, GK106, GK107, GK110, GK208 - 0fxx, 10xx, 11xx, 12xx
         0f|10|11|12)
-            # Most Kepler GPUs work with current driver
-            # But some very early Kepler need 470
-            case "$devid" in
-                # GK107 (GT 740, etc) - some need 470
-                0fc[0-9a-f]|0fd[0-9a-f]|0fe[0-9a-f])
-                    echo "580"
-                    ;;
-                # GK208 (GT 7xx low-end) 
-                1280|1281|1282|1284|1286|1287|1288|1289|128b)
-                    echo "580"
-                    ;;
-                *)
-                    echo "580"
-                    ;;
-            esac
+            # Most Kepler works with current driver
+            # Edge cases handled in explicit table above
+            echo "580"
             ;;
+            
+        # ===== Legacy drivers =====
         # Fermi (GTX 4xx, 5xx) - need 390 legacy driver
-        # Device IDs: 06xx, 08xx, 0axx, 0cxx, 0dxx, 0exx
-        06|08|0a|0c|0d|0e)
+        # Remaining 0cxx, 0dxx, 0exx not caught by explicit table
+        0c|0d|0e)
             echo "390"
             ;;
         # Tesla (GeForce 8xxx, 9xxx, 2xx, 3xx) - need 340 legacy
-        # Device IDs: 01xx, 02xx, 03xx, 04xx, 05xx, 06xx (older)
-        01|02|03|04|05)
+        # Remaining 04xx, 05xx, 06xx, 08xx, 0axx not caught above
+        04|05|06|08|0a)
             echo "340"
             ;;
-        # NV4x/G7x (GeForce 6xxx, 7xxx) - need 304 legacy
-        00)
+        # Very old GPUs - 304 legacy
+        00|01|02|03)
             echo "304"
             ;;
         *)
-            # Default to current driver, let it fail gracefully
+            # Unknown prefix - default to current driver
+            # Let it fail gracefully with a descriptive error
+            log WARN "Unknown NVIDIA device ID: $devid (prefix: $prefix)"
             echo "580"
             ;;
     esac
@@ -380,9 +461,12 @@ auto_detect_nvidia_driver() {
     echo "$min_driver"
 }
 
+
+
 count_gpu_devices() {
-    # Count actual VGA/display class devices, not grep matches
-    pciconf -lv 2>/dev/null | grep -Ei "^[a-z].*class.*=.*vga|^[a-z].*class.*=.*display" | wc -l | tr -d ' '
+    # Count actual VGA/display/3D controller class devices
+    # Include 3D controller for NVIDIA dGPUs that register that way
+    pciconf -lv 2>/dev/null | grep -Ei "^[a-z].*class.*=.*(vga|display|3d)" | wc -l | tr -d ' '
 }
 
 detect_hybrid_gpu() {
@@ -390,14 +474,14 @@ detect_hybrid_gpu() {
     gpu_count=$(count_gpu_devices)
     [ "$gpu_count" -gt 1 ] || return 1
 
-    # Check which vendors are present
+    # Check which vendors are present (include 3D controller class)
     has_intel=0
     has_amd=0
     has_nvidia=0
 
-    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display)" | grep -qi Intel && has_intel=1
-    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display)" | grep -Eiq "AMD|ATI" && has_amd=1
-    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display)" | grep -qi NVIDIA && has_nvidia=1
+    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display|3d)" | grep -qi Intel && has_intel=1
+    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display|3d)" | grep -Eiq "AMD|ATI" && has_amd=1
+    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display|3d)" | grep -qi NVIDIA && has_nvidia=1
 
     # Hybrid = Intel+NVIDIA, Intel+AMD, or AMD integrated+discrete
     vendor_count=$((has_intel + has_amd + has_nvidia))
@@ -652,9 +736,20 @@ cmd_debug() {
     echo "NVIDIA package selected: $(select_nvidia_pkg)"
     echo
 
+    # Show per-device driver mapping
+    device_ids=$(get_nvidia_device_ids)
+    if [ -n "$device_ids" ]; then
+        echo "NVIDIA per-device driver mapping:"
+        for devid in $device_ids; do
+            driver=$(nvidia_device_to_driver "$devid")
+            echo "  Device 0x$devid -> driver series $driver"
+        done
+        echo
+    fi
+
     echo "GPU devices found: $(count_gpu_devices)"
-    echo "GPU detection output:"
-    pciconf -lv | grep -B1 -A3 -Ei "class.*=.*(vga|display)" || echo "No GPU found"
+    echo "GPU detection output (VGA/display/3D controller classes):"
+    pciconf -lv | grep -B1 -A3 -Ei "class.*=.*(vga|display|3d)" || echo "No GPU found"
     echo
 
     echo "GPU vendor detection:"
@@ -693,7 +788,7 @@ Commands:
   amd           Auto-select AMD (amdgpu/radeonkms)
   amdgpu        Force AMDGPU
   radeonkms     Force radeonkms
-  nvidia        NVIDIA (auto)
+  nvidia        NVIDIA (auto-detects driver version)
   virtualbox    VirtualBox guest
   vmware        VMware guest
   qemu          QEMU/KVM guest
@@ -703,8 +798,19 @@ Commands:
   scfb          Framebuffer
   safe          Minimal
   dual          Multi-GPU output (for displays on separate GPUs)
-  debug         Diagnostic dump
+  debug         Diagnostic dump (shows per-device driver mapping)
   help          Show this help
+
+NVIDIA Driver Support:
+  Auto-detection maps GPU device IDs to appropriate driver series:
+    580 (current) - Blackwell, Ada, Ampere, Turing, Pascal, Maxwell, most Kepler
+    470 (legacy)  - Some early Kepler (GK1xx)
+    390 (legacy)  - Fermi (GTX 4xx/5xx)
+    340 (legacy)  - Tesla (GeForce 8xxx/9xxx/2xx/3xx)
+    304 (legacy)  - NV4x/G7x (GeForce 6xxx/7xxx)
+
+  For unsupported legacy GPUs, use scfb or vesa as fallback.
+  Detection includes 3D controller class for laptop/server dGPUs.
 
 Environment:
   NVIDIA_DRIVER_VERSION   NVIDIA driver major (580, 470, 390, 340, 304)
