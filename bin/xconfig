@@ -265,10 +265,28 @@ detect_nvidia_gpu() {
     pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" | grep -qi NVIDIA
 }
 
+count_gpu_devices() {
+    # Count actual VGA/display class devices, not grep matches
+    pciconf -lv 2>/dev/null | grep -Ei "^[a-z].*class.*=.*vga|^[a-z].*class.*=.*display" | wc -l | tr -d ' '
+}
+
 detect_hybrid_gpu() {
-    # Check for multiple GPU vendors (hybrid graphics)
-    gpu_vendors=$(pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" | grep -Ei "Intel|AMD|ATI|NVIDIA" | wc -l)
-    [ "$gpu_vendors" -gt 1 ]
+    # True hybrid = multiple GPU devices from different vendors
+    gpu_count=$(count_gpu_devices)
+    [ "$gpu_count" -gt 1 ] || return 1
+
+    # Check which vendors are present
+    has_intel=0
+    has_amd=0
+    has_nvidia=0
+
+    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display)" | grep -qi Intel && has_intel=1
+    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display)" | grep -Eiq "AMD|ATI" && has_amd=1
+    pciconf -lv 2>/dev/null | grep -B1 -A3 -Ei "class.*=.*(vga|display)" | grep -qi NVIDIA && has_nvidia=1
+
+    # Hybrid = Intel+NVIDIA, Intel+AMD, or AMD integrated+discrete
+    vendor_count=$((has_intel + has_amd + has_nvidia))
+    [ "$vendor_count" -gt 1 ]
 }
 
 ###############################################################################
@@ -420,17 +438,18 @@ cmd_auto() {
         return $?
     fi
 
-    # Check for hybrid graphics first
+    # For hybrid graphics, prefer discrete GPU over integrated
+    # User can manually select 'dual' if multi-monitor across GPUs is needed
     if detect_hybrid_gpu ; then
-        log INFO "Detected hybrid graphics (multiple GPUs)"
-        setup_dual
-        return $?
+        log INFO "Detected hybrid graphics (multiple GPUs from different vendors)"
+        log INFO "Selecting discrete GPU; use 'dual' command for multi-GPU output"
     fi
 
-    if detect_intel_gpu ; then
-        log INFO "Detected Intel GPU"
-        setup_intel_config
-        return $?
+    # Priority: NVIDIA > AMD > Intel (discrete over integrated)
+    if detect_nvidia_gpu ; then
+        log INFO "Detected NVIDIA GPU"
+        setup_nvidia
+        return 0
     fi
 
     if detect_amd_gpu ; then
@@ -439,10 +458,10 @@ cmd_auto() {
         return $?
     fi
 
-    if detect_nvidia_gpu ; then
-        log INFO "Detected NVIDIA GPU"
-        setup_nvidia
-        return 0
+    if detect_intel_gpu ; then
+        log INFO "Detected Intel GPU"
+        setup_intel_config
+        return $?
     fi
 
     log WARN "No supported GPU found — using scfb"
@@ -460,13 +479,14 @@ cmd_debug() {
     echo "NVIDIA driver version: $NVIDIA_DRIVER_VERSION"
     echo
 
+    echo "GPU devices found: $(count_gpu_devices)"
     echo "GPU detection output:"
-    pciconf -lv | grep -A4 -Ei "vga|display" || echo "No GPU found"
+    pciconf -lv | grep -B1 -A3 -Ei "class.*=.*(vga|display)" || echo "No GPU found"
     echo
 
     echo "GPU vendor detection:"
-    echo "  Intel: $(detect_intel_gpu && echo "yes" || echo "no")"
-    echo "  AMD:   $(detect_amd_gpu && echo "yes" || echo "no")"
+    echo "  Intel:  $(detect_intel_gpu && echo "yes" || echo "no")"
+    echo "  AMD:    $(detect_amd_gpu && echo "yes" || echo "no")"
     echo "  NVIDIA: $(detect_nvidia_gpu && echo "yes" || echo "no")"
     echo "  Hybrid: $(detect_hybrid_gpu && echo "yes" || echo "no")"
     echo
@@ -509,7 +529,7 @@ Commands:
   vesa          VESA
   scfb          Framebuffer
   safe          Minimal
-  dual          Dual monitor / hybrid graphics
+  dual          Multi-GPU output (for displays on separate GPUs)
   debug         Diagnostic dump
   help          Show this help
 
