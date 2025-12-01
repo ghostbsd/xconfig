@@ -1,14 +1,4 @@
 #!/bin/sh
-#
-# xconfig - Intelligent X11 configuration tool for GhostBSD / FreeBSD
-#
-# - Detects GPUs and common hypervisors
-# - Installs appropriate drivers (optionally from /xdrivers)
-# - Applies tuned Xorg configuration templates
-# - Supports Xorg and XLibre X servers
-#
-# This version includes explicit bhyve detection which maps to the scfb template.
-#
 
 set -eu
 
@@ -295,13 +285,45 @@ detect_hybrid_gpu() {
 
 select_nvidia_pkg() {
     server=$(detect_x_server)
+    prefix="nvidia-driver"
 
     if [ "$server" = "xlibre" ]; then
-        echo "xlibre-nvidia-driver-${NVIDIA_DRIVER_VERSION}"
+        prefix="xlibre-nvidia-driver"
+    fi
+
+    # If user specified a full version (contains '.'), use it directly
+    case "$NVIDIA_DRIVER_VERSION" in
+        *.*)
+            echo "${prefix}-${NVIDIA_DRIVER_VERSION}"
+            return
+            ;;
+    esac
+
+    # Otherwise, search for matching package by major version
+    # Exclude -devel packages unless explicitly requested
+    match=$(pkg search -q "^${prefix}-${NVIDIA_DRIVER_VERSION}" 2>/dev/null | \
+            grep -v -- "-devel" | \
+            head -n 1)
+
+    if [ -n "$match" ]; then
+        echo "$match"
         return
     fi
 
-    echo "nvidia-driver-${NVIDIA_DRIVER_VERSION}"
+    # Fallback: try the latest non-legacy driver
+    match=$(pkg search -q "^${prefix}-[0-9]" 2>/dev/null | \
+            grep -Ev -- "-(304|340|390|470|devel)" | \
+            sort -t- -k3 -V | \
+            tail -n 1)
+
+    if [ -n "$match" ]; then
+        log WARN "Requested driver ${NVIDIA_DRIVER_VERSION} not found, using $match"
+        echo "$match"
+        return
+    fi
+
+    # Last resort: return what was requested, let pkg fail with clear error
+    echo "${prefix}-${NVIDIA_DRIVER_VERSION}"
 }
 
 ###############################################################################
@@ -476,7 +498,8 @@ cmd_debug() {
     echo "===== xconfig debug ====="
     echo "kern.vm_guest: $(detect_vm_guest)"
     echo "Detected X server: $(detect_x_server)"
-    echo "NVIDIA driver version: $NVIDIA_DRIVER_VERSION"
+    echo "NVIDIA driver version setting: $NVIDIA_DRIVER_VERSION"
+    echo "NVIDIA package selected: $(select_nvidia_pkg)"
     echo
 
     echo "GPU devices found: $(count_gpu_devices)"
@@ -534,7 +557,8 @@ Commands:
   help          Show this help
 
 Environment:
-  NVIDIA_DRIVER_VERSION   NVIDIA driver version (default: 580)
+  NVIDIA_DRIVER_VERSION   NVIDIA driver major (580) or full version
+                          (580.105.08). Default: 580
 
 EOF
 }
