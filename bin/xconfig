@@ -39,6 +39,52 @@ log() {
 }
 
 ###############################################################################
+# rc.conf management helpers
+###############################################################################
+
+rc_conf_has() {
+    key=$1
+
+    if grep "^$key=" /etc/rc.conf >/dev/null 2>&1 ; then
+        return 0
+    fi
+
+    if [ -f /etc/rc.conf.local ] && grep "^$key=" /etc/rc.conf.local >/dev/null 2>&1 ; then
+        return 0
+    fi
+
+    return 1
+}
+
+enable_rc_conf() {
+    key=$1
+    val=$2
+
+    if rc_conf_has "$key" ; then
+        log INFO "$key already set in rc.conf or rc.conf.local"
+    else
+        log INFO "Enabling $key=$val"
+        sysrc "${key}=${val}"
+    fi
+}
+
+start_service_safe() {
+    svc=$1
+
+    if service "$svc" onestatus >/dev/null 2>&1 ; then
+        log INFO "$svc already running"
+        return 0
+    fi
+
+    log INFO "Starting $svc"
+    if service "$svc" start >/dev/null 2>&1 ; then
+        log INFO "$svc started"
+    else
+        log WARN "$svc failed to start"
+    fi
+}
+
+###############################################################################
 # Helpers: config directory, backup, application
 ###############################################################################
 
@@ -343,8 +389,17 @@ setup_nvidia() {
 }
 
 setup_virtualbox() {
-    log INFO "Setting up VirtualBox guest"
-    apply_config_template "XF86Config.virtualbox" || log WARN "Failed to apply VirtualBox template"
+        log INFO "Setting up VirtualBox environment"
+
+        apply_config_template "XF86Config.virtualbox" || log WARN "VirtualBox template missing"
+
+        # Enable required rc.conf settings
+        enable_rc_conf "vboxguest_enable" "YES"
+        enable_rc_conf "vboxservice_enable" "YES"
+
+        # Start services
+        start_service_safe "vboxguest"
+        start_service_safe "vboxservice"
 }
 
 setup_vmware() {
