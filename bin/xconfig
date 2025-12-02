@@ -175,6 +175,21 @@ pkg_install_wrapper() {
 }
 
 ###############################################################################
+# Dialog utility detection
+###############################################################################
+
+# Detect available dialog utility (bsddialog preferred, dialog as fallback)
+detect_dialog() {
+    if command -v bsddialog >/dev/null 2>&1; then
+        echo "bsddialog"
+    elif command -v dialog >/dev/null 2>&1; then
+        echo "dialog"
+    else
+        echo ""
+    fi
+}
+
+###############################################################################
 # X server detection
 ###############################################################################
 
@@ -559,6 +574,111 @@ select_nvidia_pkg() {
 }
 
 ###############################################################################
+# NVIDIA driver menu selection
+###############################################################################
+
+# Show an interactive menu for NVIDIA driver selection
+# Returns the selected driver version via stdout
+nvidia_driver_menu() {
+    dialog_cmd=$(detect_dialog)
+
+    if [ -z "$dialog_cmd" ]; then
+        log ERROR "No dialog utility available (install bsddialog or dialog)"
+        return 1
+    fi
+
+    # Gather GPU information for display
+    device_ids=$(get_nvidia_device_ids)
+    auto_driver=$(auto_detect_nvidia_driver)
+
+    # Build GPU info string for the menu
+    gpu_info=""
+    if [ -n "$device_ids" ]; then
+        gpu_count=0
+        for devid in $device_ids; do
+            gpu_count=$((gpu_count + 1))
+            driver=$(nvidia_device_to_driver "$devid")
+            gpu_info="${gpu_info}GPU ${gpu_count}: Device ID 0x${devid} (recommended: ${driver})\n"
+        done
+    else
+        gpu_info="No NVIDIA GPU detected\n"
+    fi
+
+    # Create temporary file for dialog output
+    tmpfile=$(mktemp)
+    trap 'rm -f "$tmpfile"' EXIT
+
+    # Menu title and message
+    title="NVIDIA Driver Selection"
+    msg="Detected Hardware:\n${gpu_info}\nAuto-detected driver: ${auto_driver}\n\nSelect a driver version:"
+
+    # Build menu options
+    # Format: tag description
+    if [ "$dialog_cmd" = "bsddialog" ]; then
+        $dialog_cmd --title "$title" \
+            --menu "$msg" 20 70 7 \
+            "auto"  "Auto-detect (${auto_driver})" \
+            "580"   "Current - Blackwell, Ada, Ampere, Turing, Pascal, Maxwell" \
+            "470"   "Legacy - Early Kepler (GK1xx)" \
+            "390"   "Legacy - Fermi (GTX 4xx/5xx)" \
+            "340"   "Legacy - Tesla (GeForce 8xxx/9xxx/2xx/3xx)" \
+            "304"   "Legacy - NV4x/G7x (GeForce 6xxx/7xxx)" \
+            "cancel" "Cancel installation" \
+            2>"$tmpfile"
+    else
+        # dialog uses slightly different syntax
+        $dialog_cmd --title "$title" \
+            --menu "$msg" 20 70 7 \
+            "auto"  "Auto-detect (${auto_driver})" \
+            "580"   "Current - Blackwell, Ada, Ampere, Turing, Pascal, Maxwell" \
+            "470"   "Legacy - Early Kepler (GK1xx)" \
+            "390"   "Legacy - Fermi (GTX 4xx/5xx)" \
+            "340"   "Legacy - Tesla (GeForce 8xxx/9xxx/2xx/3xx)" \
+            "304"   "Legacy - NV4x/G7x (GeForce 6xxx/7xxx)" \
+            "cancel" "Cancel installation" \
+            2>"$tmpfile"
+    fi
+
+    result=$?
+    selection=$(cat "$tmpfile")
+    rm -f "$tmpfile"
+    trap - EXIT
+
+    # Handle dialog exit codes
+    # 0 = OK, 1 = Cancel, 255 = ESC
+    if [ $result -ne 0 ] || [ -z "$selection" ] || [ "$selection" = "cancel" ]; then
+        echo ""
+        return 1
+    fi
+
+    # Handle auto selection
+    if [ "$selection" = "auto" ]; then
+        echo "$auto_driver"
+    else
+        echo "$selection"
+    fi
+}
+
+# Setup NVIDIA with interactive driver selection
+setup_nvidia_interactive() {
+    selection=$(nvidia_driver_menu)
+
+    if [ -z "$selection" ]; then
+        log INFO "NVIDIA driver selection cancelled"
+        return 1
+    fi
+
+    log INFO "User selected NVIDIA driver: $selection"
+
+    # Set the driver version and mark it as explicitly set
+    NVIDIA_DRIVER_VERSION="$selection"
+    NVIDIA_DRIVER_VERSION_SET=1
+    export NVIDIA_DRIVER_VERSION NVIDIA_DRIVER_VERSION_SET
+
+    setup_nvidia
+}
+
+###############################################################################
 # Setup functions
 ###############################################################################
 
@@ -789,6 +909,7 @@ Commands:
   amdgpu        Force AMDGPU
   radeonkms     Force radeonkms
   nvidia        NVIDIA (auto-detects driver version)
+  nvidia-select Interactive NVIDIA driver selection menu
   virtualbox    VirtualBox guest
   vmware        VMware guest
   qemu          QEMU/KVM guest
@@ -808,6 +929,10 @@ NVIDIA Driver Support:
     390 (legacy)  - Fermi (GTX 4xx/5xx)
     340 (legacy)  - Tesla (GeForce 8xxx/9xxx/2xx/3xx)
     304 (legacy)  - NV4x/G7x (GeForce 6xxx/7xxx)
+
+  Use 'nvidia-select' for an interactive menu to manually choose a driver.
+  The menu displays detected GPU info and allows overriding auto-detection.
+  Requires bsddialog or dialog to be installed.
 
   For unsupported legacy GPUs, use scfb or vesa as fallback.
   Detection includes 3D controller class for laptop/server dGPUs.
@@ -837,6 +962,7 @@ main() {
         amdgpu)      setup_amdgpu ;;
         radeonkms)   setup_radeonkms ;;
         nvidia)      setup_nvidia ;;
+        nvidia-select) setup_nvidia_interactive ;;
         virtualbox)  setup_virtualbox ;;
         vmware)      setup_vmware ;;
         qemu)        setup_qemu ;;
