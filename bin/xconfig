@@ -175,6 +175,80 @@ pkg_install_wrapper() {
 }
 
 ###############################################################################
+# Dialog detection and wrappers
+###############################################################################
+
+# Detect available dialog tool (prefer bsddialog)
+detect_dialog_tool() {
+    if command -v bsddialog >/dev/null 2>&1; then
+        echo "bsddialog"
+    elif command -v dialog >/dev/null 2>&1; then
+        echo "dialog"
+    else
+        echo ""
+    fi
+}
+
+# Run a menu dialog, returns selected tag via stdout
+# Usage: run_menu_dialog "title" "prompt" tag1 label1 tag2 label2 ...
+run_menu_dialog() {
+    title=$1
+    prompt=$2
+    shift 2
+
+    tool=$(detect_dialog_tool)
+    if [ -z "$tool" ]; then
+        log ERROR "No dialog tool found. Install bsddialog or dialog."
+        return 1
+    fi
+
+    # Build menu items safely using set --
+    set --
+    while [ $# -ge 2 ]; do
+        set -- "$@" "$1" "$2"
+        shift 2
+    done
+
+    # Create temp file for result
+    tmpfile=$(mktemp)
+    trap "rm -f '$tmpfile'" EXIT
+
+    if [ "$tool" = "bsddialog" ]; then
+        bsddialog --title "$title" --menu "$prompt" 0 0 0 "$@" 2>"$tmpfile"
+        ret=$?
+    else
+        dialog --title "$title" --menu "$prompt" 0 0 0 "$@" 2>"$tmpfile"
+        ret=$?
+    fi
+
+    if [ $ret -eq 0 ]; then
+        cat "$tmpfile"
+    fi
+    rm -f "$tmpfile"
+    trap - EXIT
+    return $ret
+}
+
+# Display an info message box
+# Usage: run_msgbox "title" "message"
+run_msgbox() {
+    title=$1
+    message=$2
+
+    tool=$(detect_dialog_tool)
+    if [ -z "$tool" ]; then
+        echo "$message"
+        return
+    fi
+
+    if [ "$tool" = "bsddialog" ]; then
+        bsddialog --title "$title" --msgbox "$message" 0 0
+    else
+        dialog --title "$title" --msgbox "$message" 0 0
+    fi
+}
+
+###############################################################################
 # X server detection
 ###############################################################################
 
@@ -656,6 +730,221 @@ setup_dual() {
 }
 
 ###############################################################################
+# Interactive menus
+###############################################################################
+
+# NVIDIA driver version selection submenu
+menu_nvidia_driver() {
+    detected=$(auto_detect_nvidia_driver)
+    device_ids=$(get_nvidia_device_ids)
+
+    # Build info string about detected GPU
+    gpu_info=""
+    if [ -n "$device_ids" ]; then
+        gpu_info="Detected GPU(s): "
+        for devid in $device_ids; do
+            driver=$(nvidia_device_to_driver "$devid")
+            gpu_info="${gpu_info}0x${devid}(${driver}) "
+        done
+        gpu_info="${gpu_info}\nRecommended: ${detected}"
+    else
+        gpu_info="No NVIDIA GPU detected"
+    fi
+
+    choice=$(run_menu_dialog "NVIDIA Driver Selection" \
+        "Select NVIDIA driver version.\n${gpu_info}" \
+        "auto"   "Auto-detect (recommended: ${detected})" \
+        "580"    "580.x (Current - Blackwell/Ada/Ampere/Turing/Pascal/Maxwell)" \
+        "470"    "470.x (Legacy - Early Kepler)" \
+        "390"    "390.x (Legacy - Fermi GTX 4xx/5xx)" \
+        "340"    "340.x (Legacy - Tesla GeForce 8/9/2xx/3xx)" \
+        "304"    "304.x (Legacy - NV4x/G7x GeForce 6/7xxx)" \
+        "cancel" "Cancel")
+
+    case "$choice" in
+        auto)
+            setup_nvidia
+            run_msgbox "NVIDIA Setup" "NVIDIA driver installed (auto-detected: ${detected})"
+            ;;
+        580|470|390|340|304)
+            export NVIDIA_DRIVER_VERSION="$choice"
+            export NVIDIA_DRIVER_VERSION_SET=1
+            setup_nvidia
+            run_msgbox "NVIDIA Setup" "NVIDIA driver ${choice}.x installed"
+            ;;
+        cancel|"")
+            return 1
+            ;;
+    esac
+}
+
+# AMD driver selection submenu
+menu_amd_driver() {
+    choice=$(run_menu_dialog "AMD Driver Selection" \
+        "Select AMD driver configuration." \
+        "auto"      "Auto-detect (recommended)" \
+        "amdgpu"    "AMDGPU (modern AMD GPUs)" \
+        "radeonkms" "RadeonKMS (legacy AMD GPUs)" \
+        "cancel"    "Cancel")
+
+    case "$choice" in
+        auto)
+            setup_amd_auto
+            run_msgbox "AMD Setup" "AMD driver configured (auto-detected)"
+            ;;
+        amdgpu)
+            setup_amdgpu
+            run_msgbox "AMD Setup" "AMDGPU driver configured"
+            ;;
+        radeonkms)
+            setup_radeonkms
+            run_msgbox "AMD Setup" "RadeonKMS driver configured"
+            ;;
+        cancel|"")
+            return 1
+            ;;
+    esac
+}
+
+# Intel driver selection submenu
+menu_intel_driver() {
+    choice=$(run_menu_dialog "Intel Driver Selection" \
+        "Select Intel driver configuration." \
+        "template"  "Intel (with xorg.conf template)" \
+        "auto"      "Intel Auto (no xorg.conf, let X auto-configure)" \
+        "cancel"    "Cancel")
+
+    case "$choice" in
+        template)
+            setup_intel_config
+            run_msgbox "Intel Setup" "Intel GPU configured with template"
+            ;;
+        auto)
+            setup_intel_auto
+            run_msgbox "Intel Setup" "Intel GPU configured (auto mode)"
+            ;;
+        cancel|"")
+            return 1
+            ;;
+    esac
+}
+
+# Virtualization selection submenu
+menu_virtualization() {
+    detected_vm=$(detect_vm_guest)
+
+    choice=$(run_menu_dialog "Virtualization Setup" \
+        "Select hypervisor configuration.\nDetected: ${detected_vm}" \
+        "virtualbox" "VirtualBox Guest" \
+        "vmware"     "VMware Guest" \
+        "qemu"       "QEMU/KVM Guest" \
+        "hyperv"     "Hyper-V Guest" \
+        "bhyve"      "bhyve Guest" \
+        "cancel"     "Cancel")
+
+    case "$choice" in
+        virtualbox)
+            setup_virtualbox
+            run_msgbox "VirtualBox Setup" "VirtualBox guest configured"
+            ;;
+        vmware)
+            setup_vmware
+            run_msgbox "VMware Setup" "VMware guest configured"
+            ;;
+        qemu)
+            setup_qemu
+            run_msgbox "QEMU Setup" "QEMU/KVM guest configured"
+            ;;
+        hyperv)
+            setup_hyperv
+            run_msgbox "Hyper-V Setup" "Hyper-V guest configured"
+            ;;
+        bhyve)
+            setup_bhyve
+            run_msgbox "bhyve Setup" "bhyve guest configured"
+            ;;
+        cancel|"")
+            return 1
+            ;;
+    esac
+}
+
+# Main interactive setup menu
+cmd_setup() {
+    tool=$(detect_dialog_tool)
+    if [ -z "$tool" ]; then
+        log ERROR "No dialog tool available. Install bsddialog or dialog."
+        log INFO "Alternatively, use direct commands: xconfig nvidia, xconfig intel, etc."
+        return 1
+    fi
+
+    log INFO "Starting interactive setup (using $tool)"
+
+    while true; do
+        choice=$(run_menu_dialog "xconfig - X11 Configuration" \
+            "Select configuration type:" \
+            "auto"    "Automatic Detection (recommended)" \
+            "nvidia"  "NVIDIA GPU (select driver version)" \
+            "amd"     "AMD GPU (amdgpu/radeonkms)" \
+            "intel"   "Intel GPU" \
+            "vm"      "Virtualization (VirtualBox/VMware/etc.)" \
+            "dual"    "Dual GPU / Multi-monitor" \
+            "vesa"    "VESA (generic fallback)" \
+            "scfb"    "Framebuffer (syscons)" \
+            "safe"    "Safe Mode (minimal config)" \
+            "debug"   "Show Debug Info" \
+            "exit"    "Exit")
+
+        case "$choice" in
+            auto)
+                cmd_auto
+                run_msgbox "Auto Setup" "Automatic configuration complete"
+                ;;
+            nvidia)
+                menu_nvidia_driver
+                ;;
+            amd)
+                menu_amd_driver
+                ;;
+            intel)
+                menu_intel_driver
+                ;;
+            vm)
+                menu_virtualization
+                ;;
+            dual)
+                setup_dual
+                run_msgbox "Dual GPU Setup" "Dual GPU configuration applied"
+                ;;
+            vesa)
+                setup_vesa
+                run_msgbox "VESA Setup" "VESA fallback configuration applied"
+                ;;
+            scfb)
+                setup_scfb
+                run_msgbox "SCFB Setup" "Framebuffer configuration applied"
+                ;;
+            safe)
+                setup_safe
+                run_msgbox "Safe Mode" "Minimal safe configuration applied"
+                ;;
+            debug)
+                # Clear screen and show debug output
+                clear
+                cmd_debug
+                echo ""
+                echo "Press Enter to continue..."
+                read dummy
+                ;;
+            exit|"")
+                log INFO "Exiting interactive setup"
+                break
+                ;;
+        esac
+    done
+}
+
+###############################################################################
 # Auto mode
 ###############################################################################
 
@@ -783,6 +1072,8 @@ Usage: $SCRIPT_NAME <command>
 
 Commands:
   auto          Detect and configure automatically
+  setup         Interactive menu (bsddialog/dialog)
+  manual        Alias for 'setup'
   intel         Intel GPU (template)
   intel-auto    Intel GPU (no xorg.conf)
   amd           Auto-select AMD (amdgpu/radeonkms)
@@ -831,6 +1122,7 @@ main() {
 
     case "$cmd" in
         auto)        cmd_auto ;;
+        setup|manual) cmd_setup ;;
         intel)       setup_intel_config ;;
         intel-auto)  setup_intel_auto ;;
         amd)         setup_amd_auto ;;
