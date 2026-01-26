@@ -781,14 +781,6 @@ setup_nvidia_304() {
 setup_virtualbox() {
     log INFO "Setting up VirtualBox environment"
 
-    # Enable required rc.conf settings
-    enable_rc_conf "vboxguest_enable" "YES"
-    enable_rc_conf "vboxservice_enable" "YES"
-
-    # Start services
-    start_service_safe "vboxguest"
-    start_service_safe "vboxservice"
-
     # Remove xorg.conf to allow auto-detection
     backup_xorg_conf
     rm -f "$XORG_CONF"
