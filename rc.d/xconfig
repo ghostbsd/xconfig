@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# PROVIDE: xconfig
+# REQUIRE: NETWORKING devd
+# BEFORE: LOGIN
+#
+# Add the following line to /etc/rc.conf to enable xconfig:
+#
+# xconfig_enable="YES"
+#
+
+. /etc/rc.subr
+
+name="xconfig"
+rcvar="xconfig_enable"
+desc="Intelligent X11 configuration tool for GhostBSD"
+
+# Location of the xconfig binary
+xconfig_bin="${xconfig_bin:-/usr/local/bin/xconfig}"
+
+# Log file for xconfig output
+xconfig_log="${xconfig_log:-/var/log/xconfig_boot.log}"
+
+start_cmd="${name}_start"
+stop_cmd=":"
+
+xconfig_start()
+{
+    if [ ! -x "${xconfig_bin}" ]; then
+        err 1 "${xconfig_bin} not found or not executable"
+    fi
+
+    echo "Starting ${name}: Running X11 hardware detection and configuration..."
+
+    # Run xconfig in auto mode for automatic hardware detection
+    # Redirect output to log file
+    if "${xconfig_bin}" auto >> "${xconfig_log}" 2>&1; then
+        echo "${name}: X11 configuration completed successfully"
+        return 0
+    else
+        warn "${name}: X11 configuration returned non-zero exit status (check ${xconfig_log})"
+        return 0  # Don't fail boot even if xconfig has issues
+    fi
+}
+
+load_rc_config $name
+run_rc_command "$1"
