@@ -58,7 +58,6 @@ EndSection
 Section "Device"
     Identifier  "Card0"
     Driver      "vmware"
-    BusID       "PCI:0:15:0"
     Option      "HWcursor" "false"
     Option      "StaticXinerama" "false"
 EndSection

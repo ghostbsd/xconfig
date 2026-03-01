@@ -803,8 +803,12 @@ setup_virtualbox() {
 # Usage: setup_vmware
 setup_vmware() {
     log INFO "Setting up VMware guest"
-    # TODO: Proper configuration for X
+
+    enable_rc_conf "vmware_guestd_enable" "YES"
+    start_service_safe "vmware_guestd"
+
     apply_config_template "XF86Config.vmware" || log WARN "Failed to apply VMware template"
+    log INFO "VMware configured"
 }
 
 # Function: setup_qemu
@@ -814,8 +818,15 @@ setup_vmware() {
 # Usage: setup_qemu
 setup_qemu() {
     log INFO "Setting up QEMU/KVM guest"
-    # TODO: Proper configuration for X here
-    apply_config_template "XF86Config.qemu" || log WARN "Failed to apply QEMU template"
+    if pciconf -l 2>/dev/null | grep -q "vendor=0x1b36.*device=0x0100"; then
+        log INFO "QXL device detected, applying QXL configuration"
+        apply_config_template "XF86Config.qemu" || log WARN "Failed to apply QEMU template"
+    else
+        log INFO "No QXL device found, using Xorg auto-detection"
+        backup_xorg_conf
+        rm -f "$XORG_CONF"
+    fi
+    log INFO "QEMU/KVM configured"
 }
 
 # Function: setup_hyperv
@@ -844,6 +855,70 @@ setup_bhyve() {
     fi
     log INFO "XF86Config.bhyve not found. Falling back to XF86Config.scfb"
     apply_config_template "XF86Config.scfb"
+}
+
+###############################################################################
+# Cleanup functions - remove unused VM packages and templates
+###############################################################################
+
+cleanup_virtualbox() {
+    log INFO "Removing VirtualBox guest packages and template"
+    pkg delete -yg "*virtualbox-ose-additions*" 2>/dev/null || true
+    CONFIG_DIR=$(find_config_dir || true)
+    [ -n "$CONFIG_DIR" ] && rm -f "$CONFIG_DIR/XF86Config.virtualbox"
+}
+
+cleanup_vmware() {
+    log INFO "Removing VMware guest packages and template"
+    pkg delete -yg "*xf86-video-vmware*" 2>/dev/null || true
+    pkg delete -yg "*open-vm-tools*" 2>/dev/null || true
+    CONFIG_DIR=$(find_config_dir || true)
+    [ -n "$CONFIG_DIR" ] && rm -f "$CONFIG_DIR/XF86Config.vmware"
+}
+
+cleanup_qemu() {
+    log INFO "Removing QEMU guest packages and template"
+    pkg delete -yg "*xf86-video-qxl*" 2>/dev/null || true
+    CONFIG_DIR=$(find_config_dir || true)
+    [ -n "$CONFIG_DIR" ] && rm -f "$CONFIG_DIR/XF86Config.qemu"
+}
+
+cleanup_hyperv() {
+    log INFO "Removing Hyper-V template"
+    CONFIG_DIR=$(find_config_dir || true)
+    [ -n "$CONFIG_DIR" ] && rm -f "$CONFIG_DIR/XF86Config.hyperv"
+}
+
+cleanup_bhyve() {
+    log INFO "Removing bhyve template"
+    CONFIG_DIR=$(find_config_dir || true)
+    [ -n "$CONFIG_DIR" ] && rm -f "$CONFIG_DIR/XF86Config.bhyve"
+}
+
+cleanup_xdrivers() {
+    if [ -d /xdrivers ]; then
+        log INFO "Removing /xdrivers"
+        rm -rf /xdrivers
+    fi
+}
+
+cleanup_drm() {
+    log INFO "Removing DRM packages and modules"
+    remove_from_kld_list "/boot/modules/i915kms.ko"
+    remove_from_kld_list "/boot/modules/amdgpu.ko"
+    remove_from_kld_list "/boot/modules/radeonkms.ko"
+    for mod in i915kms amdgpu radeonkms; do
+        if kldstat 2>/dev/null | grep -q "$mod"; then
+            kldunload "$mod" 2>/dev/null || log WARN "Failed to unload $mod"
+        fi
+    done
+    for pkg_glob in \
+        "*drm-kmod*" \
+        "*gpu-firmware-amd-kmod*" \
+        "*gpu-firmware-intel-kmod*" \
+        "*gpu-firmware-radeon-kmod*"; do
+        pkg delete -yg "$pkg_glob" 2>/dev/null || true
+    done
 }
 
 # Function: setup_scfb
@@ -1017,43 +1092,70 @@ cmd_auto() {
     # Hypervisors first
     if detect_virtualbox; then
         log INFO "Detected VirtualBox guest"
+        cleanup_vmware
+        cleanup_qemu
+        cleanup_hyperv
+        cleanup_bhyve
+        cleanup_drm
+        cleanup_xdrivers
         setup_virtualbox
         return 0
     fi
+    cleanup_virtualbox
 
     if detect_vmware; then
         log INFO "Detected VMware guest"
+        cleanup_qemu
+        cleanup_hyperv
+        cleanup_bhyve
+        cleanup_drm
+        cleanup_xdrivers
         setup_vmware
         return 0
     fi
+    cleanup_vmware
 
     if detect_qemu; then
         log INFO "Detected QEMU/KVM guest"
+        cleanup_hyperv
+        cleanup_bhyve
+        cleanup_drm
+        cleanup_xdrivers
         setup_qemu
         return 0
     fi
+    cleanup_qemu
 
     if detect_hyperv; then
         log INFO "Detected Hyper-V guest"
+        cleanup_bhyve
+        cleanup_drm
+        cleanup_xdrivers
         setup_hyperv
         return 0
     fi
+    cleanup_hyperv
 
     if detect_bhyve; then
         log INFO "Detected bhyve guest"
+        cleanup_drm
+        cleanup_xdrivers
         setup_bhyve
         return 0
     fi
+    cleanup_bhyve
 
-    # Physical GPUs
+    # Physical GPUs - Intel and AMD use DRM, NVIDIA does not
     if detect_intel_gpu; then
         log INFO "Detected Intel GPU"
+        cleanup_xdrivers
         setup_intel_drm
         return 0
     fi
 
     if detect_amd_gpu; then
         log INFO "Detected AMD GPU"
+        cleanup_xdrivers
         if detect_radeon_device; then
             log INFO "Using radeonkms for older AMD card (RADEON_DEVICE match)"
             setup_radeonkms_drm
@@ -1066,13 +1168,17 @@ cmd_auto() {
 
     if detect_nvidia_gpu; then
         log INFO "Detected NVIDIA GPU"
+        cleanup_drm
         nvidia_version=$(detect_nvidia_driver_version)
         log INFO "NVIDIA driver version needed: $nvidia_version"
         setup_nvidia_driver "$nvidia_version"
+        cleanup_xdrivers
         return 0
     fi
 
     # Fallback
+    cleanup_drm
+    cleanup_xdrivers
     log WARN "Could not identify a supported GPU or hypervisor. Falling back to scfb"
     setup_scfb
 }
