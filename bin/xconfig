@@ -870,7 +870,8 @@ cleanup_virtualbox() {
 
 cleanup_vmware() {
     log INFO "Removing VMware guest packages and template"
-    pkg delete -yg "*xf86-video-vmware*" "*open-vm-tools*" 2>/dev/null || true
+    pkg delete -yg "*xf86-video-vmware*" 2>/dev/null || true
+    pkg delete -yg "*open-vm-tools*" 2>/dev/null || true
     CONFIG_DIR=$(find_config_dir || true)
     [ -n "$CONFIG_DIR" ] && rm -f "$CONFIG_DIR/XF86Config.vmware"
 }
