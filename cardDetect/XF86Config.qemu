@@ -57,9 +57,7 @@ EndSection
 
 Section "Device"
     Identifier  "Card0"
-    Driver      "cirrus"
-    Option      "ShadowFB" "false"
-    Option      "UseFBDev" "false"
+    Driver      "qxl"
 EndSection
 
 Section "Screen"
