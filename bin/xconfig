@@ -326,9 +326,6 @@ detect_qemu() {
     if echo "$guest" | grep -qi "qemu"; then
         return 0
     fi
-    if dmesg 2>/dev/null | grep -qi "QEMU"; then
-        return 0
-    fi
     return 1
 }
 
@@ -371,7 +368,7 @@ detect_bhyve() {
 # Returns: 0 if Intel GPU detected, 1 otherwise
 # Usage: if detect_intel_gpu; then ...
 detect_intel_gpu() {
-    if pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" | grep -qi "Intel"; then
+    if pciconf -lv 2>/dev/null | grep -B4 -E "VGA" | grep -qi "Intel"; then
         return 0
     fi
     return 1
@@ -383,7 +380,7 @@ detect_intel_gpu() {
 # Returns: 0 if AMD/ATI GPU detected, 1 otherwise
 # Usage: if detect_amd_gpu; then ...
 detect_amd_gpu() {
-    if pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" | grep -Eiq "AMD|ATI"; then
+    if pciconf -lv 2>/dev/null | grep -B4 -E "VGA" | grep -Eq "AMD|ATI"; then
         return 0
     fi
     return 1
@@ -395,7 +392,7 @@ detect_amd_gpu() {
 # Returns: 0 if NVIDIA GPU detected, 1 otherwise
 # Usage: if detect_nvidia_gpu; then ...
 detect_nvidia_gpu() {
-    if pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" | grep -qi "NVIDIA"; then
+    if pciconf -lv 2>/dev/null | grep -B4 -E "VGA" | grep -qi "NVIDIA"; then
         return 0
     fi
     return 1
@@ -1198,7 +1195,7 @@ cmd_debug() {
     echo
 
     echo "Detected GPUs (pciconf):"
-    pciconf -lv 2>/dev/null | grep -A4 -Ei "vga|display" || echo "No VGA/display controllers found"
+    pciconf -lv 2>/dev/null | grep -B4 -E "VGA" || echo "No VGA/display controllers found"
     echo
 
     echo "X server detection:"
