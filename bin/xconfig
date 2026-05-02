@@ -43,7 +43,6 @@ NVIDIA_390_CARDS="GeForce GTX 480|GeForce GTX 465|GeForce GTX 480M|GeForce GTX 4
 
 NVIDIA_340_CARDS="GeForce 8800 GTX|GeForce 8800 GTS|GeForce 8800 Ultra|Tesla C870|Quadro FX 5600|Quadro FX 4600|GeForce 8600 GTS|GeForce 8600 GT|GeForce 8600 GT|GeForce 8600 GS|GeForce 8400 GS|GeForce 9500M GS|GeForce 8300 GS|GeForce 8600M GT|GeForce 9650M GS|GeForce 8700M GT|Quadro FX 370|Quadro NVS 320M|Quadro FX 570M|Quadro FX 1600M|Quadro FX 570|Quadro FX 1700|GeForce GT 330|GeForce 8400 SE|GeForce 8500 GT|GeForce 8400 GS|GeForce 8300 GS|GeForce 8400 GS|GeForce 8600M GS|GeForce 8400M GT|GeForce 8400M GS|GeForce 8400M G|Quadro NVS 140M|Quadro NVS 130M|Quadro NVS 135M|GeForce 9400 GT|Quadro FX 360M|GeForce 9300M G|Quadro NVS 290|GeForce GTX 295|GeForce GTX 280|GeForce GTX 260|GeForce GTX 285|GeForce GTX 275|Tesla C1060|Tesla T10 Processor|Tesla T10 Processor|Tesla M1060|Tesla M1060|Tesla M1060|GeForce GTX 260|GeForce GTX 295|Quadroplex 2200 D2|Quadroplex 2200 S4|Quadro CX|Quadro FX 5800|Quadro FX 4800|Quadro FX 3800|GeForce 8800 GTS 512|GeForce 9800 GT|GeForce 8800 GT|GeForce GT 230|GeForce 9800 GX2|GeForce 9800 GT|GeForce 8800 GS|GeForce GTS 240|GeForce 9800M GTX|GeForce 8800M GTS|GeForce 8800 GS|GeForce GTX 280M|GeForce 9800M GT|GeForce 8800M GTX|GeForce 8800 GS|GeForce GTX 285M|GeForce 9600 GSO|GeForce 8800 GT|GeForce 9800 GTX/9800 GTX+|GeForce 9800 GTX+|GeForce 9800 GT|GeForce GTS 250|GeForce 9800M GTX|GeForce GTX 260M|Quadro FX 4700 X2|Quadro FX 3700|Quadro VX 200|Quadro FX 3600M|Quadro FX 2800M|Quadro FX 3700M|Quadro FX 3800M|GeForce GT 230|GeForce 9600 GT|GeForce 9600 GS|GeForce 9600 GSO 512|GeForce GT 130|GeForce GT 140|GeForce 9800M GTS|GeForce 9700M GTS|GeForce 9800M GS|GeForce 9800M GTS|GeForce 9600 GT|GeForce 9600 GT|GeForce GT 130|GeForce 9700 S|GeForce GTS 160M|GeForce GTS 150M|GeForce 9600 GSO|GeForce 9600 GT|Quadro FX 1800|Quadro FX 2700M|GeForce 9500 GT|GeForce 9400 GT|GeForce 9500 GT|GeForce 9500 GS|GeForce 9500 GS|GeForce GT 120|GeForce 9600M GT|GeForce 9600M GS|GeForce 9600M GT|GeForce GT 220M|GeForce 9700M GT|GeForce 9500M G|GeForce 9650M GT|GeForce G 110M|GeForce GT 130M|GeForce GT 240M LE|GeForce GT 120M|GeForce GT 220M|GeForce GT 320M|GeForce GT 320M|GeForce GT 120|GeForce GT 120|Quadro FX 380|Quadro FX 580|Quadro FX 1700M|GeForce 9400 GT|Quadro FX 770M|GeForce 9300 GE|GeForce 9300 GS|GeForce 8400|GeForce 8400 SE|GeForce 8400 GS|GeForce 9300M GS|GeForce G100|GeForce 9300 SE|GeForce 9200M GS|GeForce 9200M GE|GeForce 9300M GS|Quadro NVS 150M|Quadro NVS 160M|GeForce G 105M|GeForce G 103M|GeForce G105M|Quadro NVS 420|Quadro FX 370 LP|Quadro FX 370 Low Profile|Quadro NVS 450|Quadro FX 370M|Quadro NVS 295|HICx16 + Graphics|HICx8 + Graphics|GeForce 8200M|GeForce 9100M G|GeForce 8200M G|GeForce 9200|GeForce 9100|GeForce 8300|GeForce 8200|nForce 730a|GeForce 9200|nForce 980a/780a SLI|nForce 750a SLI|GeForce 8100 / nForce 720a|GeForce 9400|GeForce 9400|GeForce 9400M G|GeForce 9400M|GeForce 9300|ION|GeForce 9400M G|GeForce 9400M|GeForce 9400|nForce 760i SLI|GeForce 9400|GeForce 9400|GeForce 9300 / nForce 730i|GeForce 9200|GeForce 9100M G|GeForce 8200M G|GeForce 9400M|GeForce 9200|GeForce G102M|GeForce G205M|GeForce G102M|GeForce G205M|ION|ION|GeForce 9400|ION|ION LE|ION LE|GeForce 320M|GeForce 320M|GeForce 320M|GeForce 320M|GeForce 320M|GeForce GT 220|GeForce 315|GeForce 210|GeForce 405|GeForce 405|GeForce GT 230M|GeForce GT 330M|GeForce GT 230M|GeForce GT 330M|NVS 5100M|GeForce GT 320M|GeForce GT 415|GeForce GT 240M|GeForce GT 325M|Quadro 400|Quadro FX 880M|GeForce G210|GeForce 205|GeForce 310|Second Generation ION|GeForce 210|GeForce 310|GeForce 315|GeForce G105M|GeForce G105M|NVS 2100M|NVS 3100M|GeForce 305M|Second Generation ION|Second Generation ION|GeForce 310M|Second Generation ION|Second Generation ION|GeForce 305M|GeForce 310M|GeForce 305M|Second Generation ION|Second Generation ION|GeForce G210M|GeForce G210|GeForce 310M|Second Generation ION|Second Generation ION|Quadro FX 380 LP|GeForce 315M|GeForce 405|GeForce 405|GeForce 405|GeForce 405|GeForce 405|GeForce 405M|GeForce 405M|GeForce 405|GeForce 405|GeForce 405|Quadro FX 380M|GeForce GT 330|GeForce GT 320|GeForce GT 240|GeForce GT 340|GeForce GT 220|GeForce GT 330|GeForce GTS 260M|GeForce GTS 250M|GeForce GT 220|GeForce GT 335M|GeForce GTS 350M|GeForce GTS 360M|Quadro FX 1800M|GeForce 9300 GS|GeForce 8400GS|GeForce 405|NVS 300"
 
-NVIDIA_304_CARDS="GeForce 6800 Ultra|GeForce 6800|GeForce 6800 LE|GeForce 6800 XE|GeForce 6800 XT|GeForce 6800 GT|GeForce 6800 GT|GeForce 6800 GS|GeForce 6800 XT|Quadro FX 4000|GeForce 7800 GTX|GeForce 7800 GTX|GeForce 7800 GT|GeForce 7800 GS|GeForce 7800 SLI|GeForce Go 7800|GeForce Go 7800 GTX|Quadro FX 4500|GeForce 6800 GS|GeForce 6800|GeForce 6800 LE|GeForce 6800 XT|GeForce Go 6800|GeForce Go 6800 Ultra|Quadro FX Go1400|Quadro FX 3450/4000 SDI|Quadro FX 1400|GeForce 6600 GT|GeForce 6600|GeForce 6200|GeForce 6600 LE|GeForce 7800 GS|GeForce 6800 GS|Quadro FX 3400/Quadro FX 4000|GeForce 6800 Ultra|GeForce 6600 GT|GeForce 6600|GeForce 6600 LE|GeForce 6600 VE|GeForce Go 6600|GeForce 6610 XL|GeForce Go 6600 TE/6200 TE|GeForce 6700 XL|GeForce Go 6600|GeForce Go 6600 GT|Quadro NVS 440|Quadro FX 540M|Quadro FX 550|Quadro FX 540|GeForce 6200|GeForce 6500|GeForce 6200 TurboCache(TM)|GeForce 6200SE TurboCache(TM)|GeForce 6200 LE|GeForce Go 6200|Quadro NVS 285|GeForce Go 6400|GeForce Go 6200|GeForce Go 6400|GeForce 6250|GeForce 7100 GS|GeForce 7350 LE|GeForce 7300 LE|GeForce 7550 LE|GeForce 7300 SE/7200 GS|GeForce Go 7200|GeForce Go 7300|GeForce Go 7400|Quadro NVS 110M|Quadro NVS 120M|Quadro FX 350M|GeForce 7500 LE|Quadro FX 350|GeForce 7300 GS|GeForce 6800|GeForce 6800 LE|GeForce 6800 GT|GeForce 6800 XT|GeForce 6200|GeForce 6200 A-LE|GeForce 6150|GeForce 6150 LE|GeForce 6100|GeForce Go 6150|Quadro NVS 210S / GeForce 6150LE|GeForce Go 6100|GeForce 7900 GTX|GeForce 7900 GT/GTO|GeForce 7900 GS|GeForce 7950 GX2|GeForce 7950 GX2|GeForce 7950 GT|GeForce Go 7950 GTX|GeForce Go 7900 GS|Quadro NVS 510M|Quadro FX 2500M|Quadro FX 1500M|Quadro FX 5500|Quadro FX 3500|Quadro FX 1500|Quadro FX 4500 X2|GeForce 7600 GT|GeForce 7600 GS|GeForce 7300 GT|GeForce 7900 GS|GeForce 7950 GT|GeForce 7650 GS|GeForce 7650 GS|GeForce 7600 GT|GeForce 7600 GS|GeForce 7300 GT|GeForce 7600 LE|GeForce 7300 GT|GeForce Go 7700|GeForce Go 7600|GeForce Go 7600 GT|Quadro FX 560M|Quadro FX 560|GeForce 6150SE nForce 430|GeForce 6100 nForce 405|GeForce 6100 nForce 400|GeForce 6100 nForce 420|GeForce 7025 / nForce 630a|GeForce 7150M / nForce 630M|GeForce 7000M / nForce 610M|GeForce 7050 PV / nForce 630a|GeForce 7050 PV / nForce 630a|GeForce 7025 / nForce 630a|GeForce 7150 / nForce 630i|GeForce 7100 / nForce 630i|GeForce 7050 / nForce 630i|GeForce 7050 / nForce 610i|GeForce 7050 / nForce 620i"
 
 ###############################################################################
 # Logging
@@ -637,7 +636,7 @@ setup_ati_legacy() {
 # Function: detect_nvidia_driver_version
 # Description: Determines the appropriate NVIDIA driver version based on detected GPU
 # Parameters: None (reads NVIDIA GPU info from pciconf)
-# Returns: Outputs driver version (latest, 580, 470, 390, 340, 304) to stdout
+# Returns: Outputs driver version (latest, 580, 470, 390, 340) to stdout
 # Usage: version=$(detect_nvidia_driver_version)
 detect_nvidia_driver_version() {
     # Check which NVIDIA driver version is needed based on detected card
@@ -667,11 +666,6 @@ detect_nvidia_driver_version() {
         return 0
     fi
 
-    if pciconf -lv | grep -B 3 VGA | grep -q -E "($NVIDIA_304_CARDS)"; then
-        echo "304"
-        return 0
-    fi
-
     # Default to latest driver if no match found
     echo "latest"
     return 0
@@ -680,7 +674,7 @@ detect_nvidia_driver_version() {
 # Function: setup_nvidia_driver
 # Description: Installs and configures NVIDIA driver for specified version
 # Parameters:
-#   $1 - Driver version (latest, 580, 470, 390, 340, 304)
+#   $1 - Driver version (latest, 580, 470, 390, 340)
 # Returns: None (exits on failure)
 # Usage: setup_nvidia_driver "470"
 setup_nvidia_driver() {
@@ -711,7 +705,7 @@ setup_nvidia_driver() {
 
     # Determine which kernel module to load
     # Drivers 340 and 304 use "nvidia" module, not "nvidia-modeset"
-    if [ "$version" = "340" ] || [ "$version" = "304" ]; then
+    if [ "$version" = "340" ]; then
         log INFO "Loading nvidia kernel module (legacy driver)"
         kldload nvidia 2>/dev/null || log WARN "nvidia already loaded or failed"
         sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
@@ -776,15 +770,6 @@ setup_nvidia_340() {
     setup_nvidia_driver "340"
 }
 
-# Function: setup_nvidia_304
-# Description: Configures NVIDIA 304 driver (wrapper for setup_nvidia_driver)
-# Parameters: None
-# Returns: None
-# Usage: setup_nvidia_304
-setup_nvidia_304() {
-    log INFO "Setting up NVIDIA driver 304"
-    setup_nvidia_driver "304"
-}
 
 ###############################################################################
 # Setup functions - Virtualization & Fallback
@@ -1036,7 +1021,6 @@ run_interactive() {
         "nvidia-470"     "NVIDIA driver 470" \
         "nvidia-390"     "NVIDIA driver 390" \
         "nvidia-340"     "NVIDIA driver 340" \
-        "nvidia-304"     "NVIDIA driver 304" \
         "virtualbox"     "VirtualBox Guest" \
         "vmware"         "VMware Guest" \
         "qemu"           "QEMU/KVM Guest" \
@@ -1063,7 +1047,6 @@ run_interactive() {
         nvidia-470)      setup_nvidia_470 ;;
         nvidia-390)      setup_nvidia_390 ;;
         nvidia-340)      setup_nvidia_340 ;;
-        nvidia-304)      setup_nvidia_304 ;;
         virtualbox)      setup_virtualbox ;;
         vmware)          setup_vmware ;;
         qemu)            setup_qemu ;;
@@ -1286,7 +1269,6 @@ NVIDIA Graphics:
   nvidia-470       NVIDIA driver 470
   nvidia-390       NVIDIA driver 390
   nvidia-340       NVIDIA driver 340
-  nvidia-304       NVIDIA driver 304
 
 Virtualization:
   virtualbox       VirtualBox guest (vboxguest/vboxservice modules)
@@ -1383,9 +1365,6 @@ main() {
             ;;
         nvidia-340)
             setup_nvidia_340
-            ;;
-        nvidia-304)
-            setup_nvidia_304
             ;;
         virtualbox)
             setup_virtualbox
