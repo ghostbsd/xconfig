@@ -820,15 +820,17 @@ setup_vmware() {
 # Usage: setup_qemu
 setup_qemu() {
     log INFO "Setting up QEMU/KVM guest"
-    if pciconf -l 2>/dev/null | grep -q "vendor=0x1b36.*device=0x0100"; then
-        log INFO "QXL device detected, applying QXL configuration"
-        apply_config_template "XF86Config.qemu" || log WARN "Failed to apply QEMU template"
-    else
-        log INFO "No QXL device found, using Xorg auto-detection"
-        backup_xorg_conf
-        rm -f "$XORG_CONF"
-    fi
-    log INFO "QEMU/KVM configured"
+    log INFO "Skiping QXL setup, using framebuffer drivers instead"
+    setup_fb
+#    if pciconf -l 2>/dev/null | grep -q "vendor=0x1b36.*device=0x0100"; then
+#        log INFO "QXL device detected, applying QXL configuration"
+#        apply_config_template "XF86Config.qemu" || log WARN "Failed to apply QEMU template"
+#    else
+#        log INFO "No QXL device found, using Xorg auto-detection"
+#        backup_xorg_conf
+#        rm -f "$XORG_CONF"
+#    fi
+#    log INFO "QEMU/KVM configured"
 }
 
 # Function: setup_hyperv
@@ -843,7 +845,7 @@ setup_hyperv() {
 }
 
 # Function: setup_bhyve
-# Description: Configures X11 for bhyve guest VMs using scfb fallback
+# Description: Configures X11 for bhyve guest VMs
 # Parameters: None
 # Returns: None
 # Usage: setup_bhyve
@@ -855,8 +857,7 @@ setup_bhyve() {
         log INFO "Applied XF86Config.bhyve"
         return 0
     fi
-    log INFO "XF86Config.bhyve not found. Falling back to XF86Config.scfb"
-    apply_config_template "XF86Config.scfb"
+    log INFO "XF86Config.bhyve not found. Falling back to framebuffer drivers"
 }
 
 ###############################################################################
@@ -897,34 +898,29 @@ remove_xdrivers() {
     fi
 }
 
-remove_scfb() {
-    log INFO "Removing scfb driver package"
+remove_fb() {
+    log INFO "Removing framebuffer driver packages"
     pkg delete -yg "*xf86-video-scfb*" 2>/dev/null || true
-}
-
-remove_vesa() {
-    log INFO "Removing VESA driver package"
     pkg delete -yg "*xf86-video-vesa*" 2>/dev/null || true
 }
 
-# Function: setup_scfb
-# Description: Configures generic framebuffer X11 driver (scfb)
+# Function: setup_fb
+# Description: Configures generic framebuffer X11 drivers
 # Parameters: None
 # Returns: None
-# Usage: setup_scfb
-setup_scfb() {
-    log INFO "Setting up scfb (framebuffer) configuration"
-    apply_config_template "XF86Config.scfb"
-}
-
-# Function: setup_vesa
-# Description: Configures generic VESA X11 driver (safe fallback)
-# Parameters: None
-# Returns: None
-# Usage: setup_vesa
-setup_vesa() {
-    log INFO "Setting up VESA configuration"
-    apply_config_template "XF86Config.vesa"
+# Usage: setup_fb
+setup_fb() {
+	log INFO "Setting up framebuffer configuration, (no configuration needed)"
+        backup_xorg_conf
+        rm -f "$XORG_CONF"
+	# Removing all other drivers than can be matched.
+	(
+		remove_virtualbox
+		remove_vmware
+		remove_qemu
+		remove_drm
+		remove_xdrivers
+	) || true
 }
 
 # Function: setup_safe
@@ -1026,8 +1022,7 @@ run_interactive() {
         "qemu"           "QEMU/KVM Guest" \
         "hyperv"         "Hyper-V Guest" \
         "bhyve"          "bhyve Guest" \
-        "vesa"           "Generic VESA" \
-        "scfb"           "Framebuffer (scfb)" \
+        "fb"             "Framebuffer" \
         "safe"           "Safe minimal configuration" \
         "quit"           "Exit without changes"
         #"dual"           "Dual monitor template" \
@@ -1052,8 +1047,7 @@ run_interactive() {
         qemu)            setup_qemu ;;
         hyperv)          setup_hyperv ;;
         bhyve)           setup_bhyve ;;
-        vesa)            setup_vesa ;;
-        scfb)            setup_scfb ;;
+        fb)              setup_fb ;;
         safe)            setup_safe ;;
         #dual)            setup_dual ;;  This does not seems to be a finished feature.
         quit)            log INFO "User requested quit. No changes made." ;;
@@ -1082,8 +1076,7 @@ cmd_auto() {
         remove_qemu
         remove_drm
         remove_xdrivers
-        remove_scfb
-        remove_vesa
+        remove_fb
         setup_virtualbox
         return 0
     fi
@@ -1094,23 +1087,20 @@ cmd_auto() {
         remove_qemu
         remove_drm
         remove_xdrivers
-        remove_scfb
-        remove_vesa
+        remove_fb
         setup_vmware
         return 0
     fi
     remove_vmware
 
+    remove_qemu
     if detect_qemu; then
         log INFO "Detected QEMU/KVM guest"
         remove_drm
         remove_xdrivers
-        remove_scfb
-        remove_vesa
         setup_qemu
         return 0
     fi
-    remove_qemu
 
     if detect_hyperv; then
         log INFO "Detected Hyper-V guest"
@@ -1134,8 +1124,7 @@ cmd_auto() {
     if detect_intel_gpu; then
         log INFO "Detected Intel GPU"
         remove_xdrivers
-        remove_scfb
-        remove_vesa
+        remove_fb
         setup_intel_drm
         return 0
     fi
@@ -1143,8 +1132,7 @@ cmd_auto() {
     if detect_amd_gpu; then
         log INFO "Detected AMD GPU"
         remove_xdrivers
-        remove_scfb
-        remove_vesa
+        remove_fb
         if detect_radeon_device; then
             log INFO "Using radeonkms for older AMD card (RADEON_DEVICE match)"
             setup_radeonkms_drm
@@ -1158,8 +1146,7 @@ cmd_auto() {
 
     if detect_nvidia_gpu; then
         log INFO "Detected NVIDIA GPU"
-        remove_scfb
-        remove_vesa
+        remove_fb
         nvidia_version=$(detect_nvidia_driver_version)
         log INFO "NVIDIA driver version needed: $nvidia_version"
         setup_nvidia_driver "$nvidia_version"
@@ -1169,8 +1156,8 @@ cmd_auto() {
     remove_xdrivers
 
     # Fallback
-    log WARN "Could not identify a supported GPU or hypervisor. Falling back to scfb"
-    setup_scfb
+    log WARN "Could not identify a supported GPU or hypervisor. Falling back to framebuffer drivers"
+    setup_fb
 }
 
 ###############################################################################
@@ -1275,11 +1262,10 @@ Virtualization:
   vmware           VMware guest configuration
   qemu             QEMU/KVM guest configuration
   hyperv           Hyper-V guest configuration
-  bhyve            bhyve guest (XF86Config.bhyve or scfb fallback)
+  bhyve            bhyve guest (XF86Config.bhyve)
 
 Fallback/Recovery:
-  vesa             Generic VESA configuration
-  scfb             Generic framebuffer configuration
+  fb               Generic framebuffer configuration
   safe             Safe minimal configuration
 
 Examples:
@@ -1381,11 +1367,8 @@ main() {
         bhyve)
             setup_bhyve
             ;;
-        vesa)
-            setup_vesa
-            ;;
-        scfb)
-            setup_scfb
+        fb)
+            setup_fb
             ;;
         safe)
             setup_safe
