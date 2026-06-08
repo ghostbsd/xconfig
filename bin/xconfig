@@ -26,16 +26,18 @@ SYSTEM_CONFIG_DIR="/usr/local/etc/X11/cardDetect"
 # Check if we have pkg-static and use it instead:
 if which -s "pkg-static"
 then
-	PKG="pkg-static"
+    PKG="pkg-static"
 else
-	PKG="pkg"
+    PKG="pkg"
 fi
 
-# Packages to remove:
+# List of packages to remove:
 TO_REMOVE=""
-# Packages to remove when invoked with --clean:
+# List of packages to remove when invoked with --clean:
 TO_CLEAN_REMOVE=""
 TO_CLEAN="false"
+
+TO_REMOVE_XDRIVERS="false"
 
 # Default to POSIX locale for predictable dialog output
 export LC_ALL=C
@@ -226,7 +228,9 @@ apply_config_template() {
 install_from_xdrivers() {
     pkgname=$1
     log INFO "Installing $pkgname from offline package"
-    ${PKG} add -r XDrivers "$pkgname" && return 0
+    if ${PKG} add -r XDrivers "$pkgname"; then
+        return 0
+    fi
     log WARN "Offline install of $pkgname failed"
     return 1
 }
@@ -832,6 +836,19 @@ remove_drm() {
     TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*gpu-firmware-radeon-kmod*"
 }
 
+remove_xdrivers() {
+    if [ "${TO_REMOVE_XDRIVERS}" = "false" ]; then
+        return 0
+    fi
+    if [ -d /xdrivers ]; then
+        log INFO "Removing /xdrivers"
+        rm -rf /xdrivers
+    fi
+
+    rm -f '/usr/local/etc/pkg/repo/XDrivers.conf' &&
+    log INFO "Removing XDrivers repo config" || true
+}
+
 remove_fb() {
     log INFO "Adding framebuffer driver packages to remove list"
     TO_REMOVE="${TO_REMOVE}	*xf86-video-scfb*"
@@ -839,16 +856,22 @@ remove_fb() {
 }
 
 remove_commit() {
-    [ -z "${TO_REMOVE}" ] && return 0
+    if [ -z "${TO_REMOVE}" ]; then
+        return 0
+    fi
     log INFO "Removing unnecessary drivers"
     ${PKG} delete -yg $TO_REMOVE 2>/dev/null || true
 }
 
 clean_remove_commit() {
     # Skipping this step if we haven't been invoked with --clean.
-    ${TO_CLEAN} || return 0
+    if [ "${TO_CLEAN}" = "false" ]; then
+        return 0
+    fi
     # Also skipping this step if we don't have any thing to remove.
-    [ -z "${TO_CLEAN_REMOVE}" ] && return 0
+    if [ -z "${TO_CLEAN_REMOVE}" ]; then
+        return 0
+    fi
     log INFO "Removing all unnecessary packages"
     ${PKG} delete -yg $TO_CLEAN_REMOVE 2>/dev/null || true
 }
@@ -862,13 +885,11 @@ setup_fb() {
     log INFO "Setting up framebuffer configuration, (no configuration needed)"
     backup_xorg_conf
     rm -f "$XORG_CONF"
+
     # Removing all other drivers than can be matched.
-    {
-        TO_REMOVE=""
-        remove_virtualbox
-        remove_vmware
-        remove_qemu
-    } || true
+    remove_virtualbox
+    remove_vmware
+    remove_qemu
 }
 
 # Function: setup_dual
@@ -1126,8 +1147,8 @@ cmd_debug() {
     if ${PKG} repositories XDrivers > /dev/null 2>&1
     then
         echo "XDrivers repository exists"
-	${PKG} update -fqr XDrivers
-	${PKG} rquery -ar XDrivers "%n %v" || echo "No packages found in repository"
+        ${PKG} update -fqr XDrivers
+        ${PKG} rquery -ar XDrivers "%n %v" || echo "No packages found in repository"
     else
         echo "XDrivers repository does not exist"
     fi
@@ -1233,8 +1254,10 @@ main() {
     case "$cmd" in
         clean|-c|--clean)
             TO_CLEAN="true"
-	    shift
-	    cmd=${1:-auto}
+            # Only remove XDrivers if invoked with --clean.
+            TO_REMOVE_XDRIVERS="true"
+            shift
+            cmd=${1:-auto}
             ;;
     esac
 
@@ -1293,9 +1316,11 @@ main() {
 #            setup_dual
 #            ;;
         debug)
+            TO_REMOVE_XDRIVERS="false"
             cmd_debug
             ;;
         help|-h|--help)
+            TO_REMOVE_XDRIVERS="false"
             usage
             ;;
         *)
@@ -1309,3 +1334,4 @@ main() {
 main "$@"
 remove_commit
 clean_remove_commit
+remove_xdrivers
