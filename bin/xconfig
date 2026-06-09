@@ -23,6 +23,22 @@ BACKUP_DIR="/etc/X11/backup"
 LOCAL_CONFIG_DIR="$SCRIPT_DIR/cardDetect"
 SYSTEM_CONFIG_DIR="/usr/local/etc/X11/cardDetect"
 
+# Check if we have pkg-static and use it instead:
+if which -s "pkg-static"
+then
+    PKG="pkg-static"
+else
+    PKG="pkg"
+fi
+
+# List of packages to remove:
+TO_REMOVE=""
+# List of packages to remove when invoked with --clean:
+TO_CLEAN_REMOVE=""
+TO_CLEAN="false"
+
+TO_REMOVE_XDRIVERS="false"
+
 # Default to POSIX locale for predictable dialog output
 export LC_ALL=C
 
@@ -211,32 +227,11 @@ apply_config_template() {
 # Usage: if install_from_xdrivers "nvidia-driver"; then ...
 install_from_xdrivers() {
     pkgname=$1
-
-    if [ ! -d /xdrivers ]; then
-        return 1
-    fi
-    if [ ! -f /xdrivers/drivers-list ]; then
-        return 1
-    fi
-
-    # Format: "<pkgname> <filename.pkg>"
-    filename=$(awk -v p="$pkgname" '$1 == p {print $2}' /xdrivers/drivers-list | head -n 1)
-    if [ -z "$filename" ]; then
-        return 1
-    fi
-
-    pkgpath="/xdrivers/$filename"
-    if [ ! -f "$pkgpath" ]; then
-        log WARN "Entry for $pkgname found in /xdrivers/drivers-list but $pkgpath is missing"
-        return 1
-    fi
-
-    log INFO "Installing $pkgname from offline package $pkgpath"
-    if pkg add "$pkgpath"; then
+    log INFO "Installing $pkgname from offline package"
+    if ${PKG} add -r XDrivers "$pkgname"; then
         return 0
     fi
-
-    log WARN "Offline install from $pkgpath failed for $pkgname"
+    log WARN "Offline install of $pkgname failed"
     return 1
 }
 
@@ -700,7 +695,7 @@ setup_nvidia_driver() {
     log INFO "Installing NVIDIA driver: $pkgname"
     if ! install_from_xdrivers "$pkgname"; then
         log INFO "Installing from pkg repositories"
-        pkg install -y "$pkgname" || log WARN "NVIDIA driver installation failed"
+        ${PKG} install -y "$pkgname" || log WARN "NVIDIA driver installation failed"
     fi
 
     # Determine which kernel module to load
@@ -813,95 +808,72 @@ setup_vmware() {
     log INFO "VMware configured"
 }
 
-# Function: setup_qemu
-# Description: Configures X11 for QEMU/KVM guest VMs
-# Parameters: None
-# Returns: None
-# Usage: setup_qemu
-setup_qemu() {
-    log INFO "Setting up QEMU/KVM guest"
-    log INFO "Skiping QXL setup, using framebuffer drivers instead"
-    setup_fb
-#    if pciconf -l 2>/dev/null | grep -q "vendor=0x1b36.*device=0x0100"; then
-#        log INFO "QXL device detected, applying QXL configuration"
-#        apply_config_template "XF86Config.qemu" || log WARN "Failed to apply QEMU template"
-#    else
-#        log INFO "No QXL device found, using Xorg auto-detection"
-#        backup_xorg_conf
-#        rm -f "$XORG_CONF"
-#    fi
-#    log INFO "QEMU/KVM configured"
-}
-
-# Function: setup_hyperv
-# Description: Configures X11 for Hyper-V guest VMs
-# Parameters: None
-# Returns: None
-# Usage: setup_hyperv
-setup_hyperv() {
-    log INFO "Setting up Hyper-V guest"
-    # TODO: Proper configuration for X here
-    apply_config_template "XF86Config.hyperv" || log WARN "Failed to apply Hyper-V template"
-}
-
-# Function: setup_bhyve
-# Description: Configures X11 for bhyve guest VMs
-# Parameters: None
-# Returns: None
-# Usage: setup_bhyve
-setup_bhyve() {
-    log INFO "Setting up bhyve guest using scfb"
-    # TODO: Proper configuration for X here
-    # You can either reuse scfb or create a dedicated XF86Config.bhyve
-    if apply_config_template "XF86Config.bhyve"; then
-        log INFO "Applied XF86Config.bhyve"
-        return 0
-    fi
-    log INFO "XF86Config.bhyve not found. Falling back to framebuffer drivers"
-}
-
 ###############################################################################
 # Remove functions - remove unused VM packages
 ###############################################################################
 
 remove_virtualbox() {
-    log INFO "Removing VirtualBox guest packages"
-    pkg delete -yg "*virtualbox-ose-additions*" 2>/dev/null || true
+    log INFO "Adding VirtualBox guest packages to remove list"
+    TO_REMOVE="${TO_REMOVE}	*virtualbox-ose-additions*"
 }
 
 remove_vmware() {
-    log INFO "Removing VMware guest packages"
-    pkg delete -yg "*xf86-video-vmware*" 2>/dev/null || true
-    pkg delete -yg "*open-vm-tools*" 2>/dev/null || true
+    log INFO "Adding VMware guest packages to remove list"
+    TO_REMOVE="${TO_REMOVE}	*xf86-video-vmware*"
+    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*open-vm-tools*"
 }
 
 remove_qemu() {
-    log INFO "Removing QEMU guest packages"
-    pkg delete -yg "*xf86-video-qxl*" 2>/dev/null || true
+    log INFO "Adding QEMU guest packages to remove list"
+    TO_REMOVE="${TO_REMOVE}	*xf86-video-qxl*"
 }
 
 remove_drm() {
-    log INFO "Removing DRM packages"
-    for pkg_glob in \
-        "*drm-kmod*" \
-        "*gpu-firmware-amd-kmod*" \
-        "*gpu-firmware-intel-kmod*" \
-        "*gpu-firmware-radeon-kmod*"; do
-        pkg delete -yg "$pkg_glob" 2>/dev/null || true
-    done
+    log INFO "Adding DRM packages to clean remove list"
+    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*drm-kmod*"
+    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*gpu-firmware-amd-kmod*"
+    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*gpu-firmware-intel-kmod*"
+    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*gpu-firmware-radeon-kmod*"
 }
 
 remove_xdrivers() {
+    if [ "${TO_REMOVE_XDRIVERS}" = "false" ]; then
+        return 0
+    fi
     if [ -d /xdrivers ]; then
         log INFO "Removing /xdrivers"
         rm -rf /xdrivers
     fi
+
+    rm -f '/usr/local/etc/pkg/repo/XDrivers.conf' &&
+    log INFO "Removing XDrivers repo config" || true
 }
 
 remove_fb() {
-    log INFO "Removing framebuffer driver packages"
-    pkg delete -yg "*xf86-video-scfb*" 2>/dev/null || true
-    pkg delete -yg "*xf86-video-vesa*" 2>/dev/null || true
+    log INFO "Adding framebuffer driver packages to remove list"
+    TO_REMOVE="${TO_REMOVE}	*xf86-video-scfb*"
+    TO_REMOVE="${TO_REMOVE}	*xf86-video-vesa*"
+}
+
+remove_commit() {
+    if [ -z "${TO_REMOVE}" ]; then
+        return 0
+    fi
+    log INFO "Removing unnecessary drivers"
+    ${PKG} delete -yg $TO_REMOVE 2>/dev/null || true
+}
+
+clean_remove_commit() {
+    # Skipping this step if we haven't been invoked with --clean.
+    if [ "${TO_CLEAN}" = "false" ]; then
+        return 0
+    fi
+    # Also skipping this step if we don't have any thing to remove.
+    if [ -z "${TO_CLEAN_REMOVE}" ]; then
+        return 0
+    fi
+    log INFO "Removing all unnecessary packages"
+    ${PKG} delete -yg $TO_CLEAN_REMOVE 2>/dev/null || true
 }
 
 # Function: setup_fb
@@ -910,27 +882,14 @@ remove_fb() {
 # Returns: None
 # Usage: setup_fb
 setup_fb() {
-	log INFO "Setting up framebuffer configuration, (no configuration needed)"
-        backup_xorg_conf
-        rm -f "$XORG_CONF"
-	# Removing all other drivers than can be matched.
-	(
-		remove_virtualbox
-		remove_vmware
-		remove_qemu
-		remove_drm
-		remove_xdrivers
-	) || true
-}
+    log INFO "Setting up framebuffer configuration, (no configuration needed)"
+    backup_xorg_conf
+    rm -f "$XORG_CONF"
 
-# Function: setup_safe
-# Description: Configures minimal safe X11 configuration for recovery
-# Parameters: None
-# Returns: None
-# Usage: setup_safe
-setup_safe() {
-    log INFO "Setting up safe minimal configuration"
-    apply_config_template "XF86Config.safe"
+    # Removing all other drivers than can be matched.
+    remove_virtualbox
+    remove_vmware
+    remove_qemu
 }
 
 # Function: setup_dual
@@ -1019,11 +978,7 @@ run_interactive() {
         "nvidia-340"     "NVIDIA driver 340" \
         "virtualbox"     "VirtualBox Guest" \
         "vmware"         "VMware Guest" \
-        "qemu"           "QEMU/KVM Guest" \
-        "hyperv"         "Hyper-V Guest" \
-        "bhyve"          "bhyve Guest" \
         "fb"             "Framebuffer" \
-        "safe"           "Safe minimal configuration" \
         "quit"           "Exit without changes"
         #"dual"           "Dual monitor template" \
 
@@ -1044,11 +999,7 @@ run_interactive() {
         nvidia-340)      setup_nvidia_340 ;;
         virtualbox)      setup_virtualbox ;;
         vmware)          setup_vmware ;;
-        qemu)            setup_qemu ;;
-        hyperv)          setup_hyperv ;;
-        bhyve)           setup_bhyve ;;
         fb)              setup_fb ;;
-        safe)            setup_safe ;;
         #dual)            setup_dual ;;  This does not seems to be a finished feature.
         quit)            log INFO "User requested quit. No changes made." ;;
         *)               log ERROR "Unknown selection $choice" ;;
@@ -1075,7 +1026,6 @@ cmd_auto() {
         remove_vmware
         remove_qemu
         remove_drm
-        remove_xdrivers
         remove_fb
         setup_virtualbox
         return 0
@@ -1086,44 +1036,38 @@ cmd_auto() {
         log INFO "Detected VMware guest"
         remove_qemu
         remove_drm
-        remove_xdrivers
         remove_fb
         setup_vmware
         return 0
     fi
     remove_vmware
 
+    # Just remove the QXL driver, because it is broken.
     remove_qemu
     if detect_qemu; then
         log INFO "Detected QEMU/KVM guest"
         remove_drm
-        remove_xdrivers
-        setup_qemu
+        setup_fb
         return 0
     fi
 
     if detect_hyperv; then
         log INFO "Detected Hyper-V guest"
         remove_drm
-        remove_xdrivers
-        remove_vesa
-        setup_hyperv
+        setup_fb
         return 0
     fi
 
     if detect_bhyve; then
         log INFO "Detected bhyve guest"
         remove_drm
-        remove_xdrivers
-        remove_vesa
-        setup_bhyve
+        setup_fb
         return 0
     fi
 
     # Physical GPUs - Intel and AMD use DRM, NVIDIA does not
     if detect_intel_gpu; then
         log INFO "Detected Intel GPU"
-        remove_xdrivers
         remove_fb
         setup_intel_drm
         return 0
@@ -1131,7 +1075,6 @@ cmd_auto() {
 
     if detect_amd_gpu; then
         log INFO "Detected AMD GPU"
-        remove_xdrivers
         remove_fb
         if detect_radeon_device; then
             log INFO "Using radeonkms for older AMD card (RADEON_DEVICE match)"
@@ -1150,10 +1093,8 @@ cmd_auto() {
         nvidia_version=$(detect_nvidia_driver_version)
         log INFO "NVIDIA driver version needed: $nvidia_version"
         setup_nvidia_driver "$nvidia_version"
-        remove_xdrivers
         return 0
     fi
-    remove_xdrivers
 
     # Fallback
     log WARN "Could not identify a supported GPU or hypervisor. Falling back to framebuffer drivers"
@@ -1203,19 +1144,16 @@ cmd_debug() {
     fi
     echo
 
-    if [ -d /xdrivers ]; then
-        echo "/xdrivers exists"
-        if [ -f /xdrivers/drivers-list ]; then
-            echo "drivers-list:"
-            cat /xdrivers/drivers-list
-        else
-            echo "drivers-list not present"
-        fi
+    if ${PKG} repositories XDrivers > /dev/null 2>&1
+    then
+        echo "XDrivers repository exists"
+        ${PKG} update -fqr XDrivers
+        ${PKG} rquery -ar XDrivers "%n %v" || echo "No packages found in repository"
     else
-        echo "/xdrivers does not exist"
+        echo "XDrivers repository does not exist"
     fi
 
-    echo "===== end of debug ====="
+    echo "===== End of debug ====="
 }
 
 ###############################################################################
@@ -1260,13 +1198,13 @@ NVIDIA Graphics:
 Virtualization:
   virtualbox       VirtualBox guest (vboxguest/vboxservice modules)
   vmware           VMware guest configuration
-  qemu             QEMU/KVM guest configuration
-  hyperv           Hyper-V guest configuration
-  bhyve            bhyve guest (XF86Config.bhyve)
 
 Fallback/Recovery:
   fb               Generic framebuffer configuration
-  safe             Safe minimal configuration
+
+Flags:
+  -c --clean clean Cleans everything unnecessary
+  -h --help help   Shows this message
 
 Examples:
   # Automatic detection (recommended)
@@ -1310,9 +1248,21 @@ main() {
         exit 1
     fi
 
-    cmd=${1:-auto}
+    cmd="${1:-auto}"
 
-    case $cmd in
+    # Check if we need to do a full clean up.
+    case "$cmd" in
+        clean|-c|--clean)
+            TO_CLEAN="true"
+            # Only remove XDrivers if invoked with --clean.
+            TO_REMOVE_XDRIVERS="true"
+            shift
+            cmd=${1:-auto}
+            ;;
+    esac
+
+
+    case "$cmd" in
         auto)
             cmd_auto
             ;;
@@ -1358,29 +1308,19 @@ main() {
         vmware)
             setup_vmware
             ;;
-        qemu)
-            setup_qemu
-            ;;
-        hyperv)
-            setup_hyperv
-            ;;
-        bhyve)
-            setup_bhyve
-            ;;
         fb)
             setup_fb
-            ;;
-        safe)
-            setup_safe
             ;;
 # Seems to be an unfinished feature
 #        dual)
 #            setup_dual
 #            ;;
         debug)
+            TO_REMOVE_XDRIVERS="false"
             cmd_debug
             ;;
         help|-h|--help)
+            TO_REMOVE_XDRIVERS="false"
             usage
             ;;
         *)
@@ -1392,3 +1332,6 @@ main() {
 }
 
 main "$@"
+remove_commit
+clean_remove_commit
+remove_xdrivers
