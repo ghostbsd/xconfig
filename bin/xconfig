@@ -31,10 +31,6 @@ else
     PKG="pkg"
 fi
 
-# List of packages to remove:
-TO_REMOVE=""
-# List of packages to remove when invoked with --clean:
-TO_CLEAN_REMOVE=""
 TO_CLEAN="false"
 
 TO_REMOVE_XDRIVERS="false"
@@ -480,7 +476,7 @@ generate_nvidia_xorg_conf() {
         exit 1
     fi
 
-    X -configure 2>&1 | tee -a "$LOG_FILE"
+    /usr/local/bin/X -configure 2>&1 | tee -a "$LOG_FILE"
     if [ -f /root/xorg.conf.new ]; then
         log INFO "Replacing generic drivers with nvidia driver"
         sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
@@ -711,8 +707,8 @@ setup_nvidia_driver() {
     fi
 
     # Generate NVIDIA xorg.conf
-    generate_nvidia_xorg_conf
-    log INFO "NVIDIA driver configured"
+    #generate_nvidia_xorg_conf
+    #log INFO "NVIDIA driver configured"
 }
 
 # Function: setup_nvidia
@@ -812,28 +808,33 @@ setup_vmware() {
 # Remove functions - remove unused VM packages
 ###############################################################################
 
+pkg_remove() {
+    ${PKG} delete -yg "$@" 2>/dev/null || true
+}
+
+# Only removes when invoked with --clean.
+pkg_clean_remove() {
+    if [ "${TO_CLEAN}" = "false" ]; then
+        return 0
+    fi
+    pkg_remove "$@"
+}
+
 remove_virtualbox() {
-    log INFO "Adding VirtualBox guest packages to remove list"
-    TO_REMOVE="${TO_REMOVE}	*virtualbox-ose-additions*"
+    log INFO "Removing VirtualBox guest packages"
+    pkg_remove '*virtualbox-ose-additions*'
 }
 
 remove_vmware() {
-    log INFO "Adding VMware guest packages to remove list"
-    TO_REMOVE="${TO_REMOVE}	*xf86-video-vmware*"
-    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*open-vm-tools*"
-}
-
-remove_qemu() {
-    log INFO "Adding QEMU guest packages to remove list"
-    TO_REMOVE="${TO_REMOVE}	*xf86-video-qxl*"
+    log INFO "Removing VMware guest packages"
+    pkg_remove '*xf86-video-vmware*'
+    pkg_clean_remove '*open-vm-tools*'
 }
 
 remove_drm() {
-    log INFO "Adding DRM packages to clean remove list"
-    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*drm-kmod*"
-    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*gpu-firmware-amd-kmod*"
-    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*gpu-firmware-intel-kmod*"
-    TO_CLEAN_REMOVE="${TO_CLEAN_REMOVE}	*gpu-firmware-radeon-kmod*"
+    log INFO "Removing DRM packages"
+    pkg_clean_remove '*drm-kmod*' '*gpu-firmware-amd-kmod*' \
+        '*gpu-firmware-intel-kmod*' '*gpu-firmware-radeon-kmod*'
 }
 
 remove_xdrivers() {
@@ -850,30 +851,8 @@ remove_xdrivers() {
 }
 
 remove_fb() {
-    log INFO "Adding framebuffer driver packages to remove list"
-    TO_REMOVE="${TO_REMOVE}	*xf86-video-scfb*"
-    TO_REMOVE="${TO_REMOVE}	*xf86-video-vesa*"
-}
-
-remove_commit() {
-    if [ -z "${TO_REMOVE}" ]; then
-        return 0
-    fi
-    log INFO "Removing unnecessary drivers"
-    ${PKG} delete -yg $TO_REMOVE 2>/dev/null || true
-}
-
-clean_remove_commit() {
-    # Skipping this step if we haven't been invoked with --clean.
-    if [ "${TO_CLEAN}" = "false" ]; then
-        return 0
-    fi
-    # Also skipping this step if we don't have any thing to remove.
-    if [ -z "${TO_CLEAN_REMOVE}" ]; then
-        return 0
-    fi
-    log INFO "Removing all unnecessary packages"
-    ${PKG} delete -yg $TO_CLEAN_REMOVE 2>/dev/null || true
+    log INFO "Removing framebuffer driver packages"
+    pkg_remove '*xf86-video-scfb*' '*xf86-video-vesa*'
 }
 
 # Function: setup_fb
@@ -889,7 +868,6 @@ setup_fb() {
     # Removing all other drivers than can be matched.
     remove_virtualbox
     remove_vmware
-    remove_qemu
 }
 
 # Function: setup_dual
@@ -1024,7 +1002,6 @@ cmd_auto() {
     if detect_virtualbox; then
         log INFO "Detected VirtualBox guest"
         remove_vmware
-        remove_qemu
         remove_drm
         remove_fb
         setup_virtualbox
@@ -1034,7 +1011,6 @@ cmd_auto() {
 
     if detect_vmware; then
         log INFO "Detected VMware guest"
-        remove_qemu
         remove_drm
         remove_fb
         setup_vmware
@@ -1042,8 +1018,6 @@ cmd_auto() {
     fi
     remove_vmware
 
-    # Just remove the QXL driver, because it is broken.
-    remove_qemu
     if detect_qemu; then
         log INFO "Detected QEMU/KVM guest"
         remove_drm
@@ -1332,6 +1306,4 @@ main() {
 }
 
 main "$@"
-remove_commit
-clean_remove_commit
 remove_xdrivers
