@@ -12,6 +12,10 @@
 
 set -eu
 
+# rc(8) runs us without /usr/local in PATH, which hides Xorg and pkg-static.
+PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin"
+export PATH
+
 SCRIPT_NAME=$(basename "$0")
 SCRIPT_DIR=$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")
 
@@ -224,7 +228,7 @@ apply_config_template() {
 install_from_xdrivers() {
     pkgname=$1
     log INFO "Installing $pkgname from offline package"
-    if ${PKG} add -r XDrivers "$pkgname"; then
+    if ${PKG} install -y -r XDrivers "$pkgname"; then
         return 0
     fi
     log WARN "Offline install of $pkgname failed"
@@ -250,6 +254,14 @@ detect_x_server() {
         if echo "$version_output" | grep -q "XLibre X Server"; then
             x_server="xlibre"
         elif echo "$version_output" | grep -q "X.Org X Server"; then
+            x_server="xorg"
+        fi
+    fi
+
+    if [ "$x_server" = "unknown" ]; then
+        if ${PKG} info -e xlibre-server; then
+            x_server="xlibre"
+        elif ${PKG} info -e xorg-server; then
             x_server="xorg"
         fi
     fi
@@ -707,8 +719,8 @@ setup_nvidia_driver() {
     fi
 
     # Generate NVIDIA xorg.conf
-    #generate_nvidia_xorg_conf
-    #log INFO "NVIDIA driver configured"
+    generate_nvidia_xorg_conf
+    log INFO "NVIDIA driver configured"
 }
 
 # Function: setup_nvidia
