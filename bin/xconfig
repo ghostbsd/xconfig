@@ -37,8 +37,6 @@ fi
 
 TO_CLEAN="false"
 
-TO_REMOVE_XDRIVERS="false"
-
 # Default to POSIX locale for predictable dialog output
 export LC_ALL=C
 
@@ -850,15 +848,12 @@ remove_drm() {
 }
 
 remove_xdrivers() {
-    if [ "${TO_REMOVE_XDRIVERS}" = "false" ]; then
-        return 0
-    fi
     if [ -d /xdrivers ]; then
         log INFO "Removing /xdrivers"
         rm -rf /xdrivers
     fi
 
-    rm -f '/usr/local/etc/pkg/repo/XDrivers.conf' &&
+    rm -f '/usr/local/etc/pkg/repos/XDrivers.conf' &&
     log INFO "Removing XDrivers repo config" || true
 }
 
@@ -1240,8 +1235,6 @@ main() {
     case "$cmd" in
         clean|-c|--clean)
             TO_CLEAN="true"
-            # Only remove XDrivers if invoked with --clean.
-            TO_REMOVE_XDRIVERS="true"
             shift
             cmd=${1:-auto}
             ;;
@@ -1302,12 +1295,12 @@ main() {
 #            setup_dual
 #            ;;
         debug)
-            TO_REMOVE_XDRIVERS="false"
             cmd_debug
+            return 0
             ;;
         help|-h|--help)
-            TO_REMOVE_XDRIVERS="false"
             usage
+            return 0
             ;;
         *)
             log ERROR "Unknown command: $cmd"
@@ -1315,7 +1308,8 @@ main() {
             exit 1
             ;;
     esac
+
+    remove_xdrivers
 }
 
 main "$@"
-remove_xdrivers
