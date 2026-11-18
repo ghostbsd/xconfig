@@ -674,7 +674,7 @@ detect_nvidia_driver_version() {
 # Description: Installs and configures NVIDIA driver for specified version
 # Parameters:
 #   $1 - Driver version (latest, 580, 470, 390, 340)
-# Returns: None (exits on failure)
+# Returns: 1 if driver package installation fails; configuration errors may exit
 # Usage: setup_nvidia_driver "470"
 setup_nvidia_driver() {
     version=$1
@@ -699,8 +699,19 @@ setup_nvidia_driver() {
     log INFO "Installing NVIDIA driver: $pkgname"
     if ! install_from_xdrivers "$pkgname"; then
         log INFO "Installing from pkg repositories"
-        ${PKG} install -y "$pkgname" || log WARN "NVIDIA driver installation failed"
+        if ! ${PKG} install -y "$pkgname"; then
+            log ERROR "NVIDIA driver installation failed; leaving existing boot configuration unchanged"
+            return 1
+        fi
     fi
+
+    # Remove framebuffer packages only after NVIDIA installation succeeds.
+    remove_fb
+
+    # Clear stale DRM boot modules only after the NVIDIA package is installed.
+    remove_from_kld_list "/boot/modules/i915kms.ko"
+    remove_from_kld_list "/boot/modules/amdgpu.ko"
+    remove_from_kld_list "/boot/modules/radeonkms.ko"
 
     # Determine which kernel module to load
     # Drivers 340 and 304 use "nvidia" module, not "nvidia-modeset"
@@ -994,6 +1005,7 @@ get_gpu_preference() {
     preference="${XCONFIG_GPU:-}"
 
     if [ -z "$preference" ] && command -v sysrc >/dev/null 2>&1; then
+        # Read global rc.conf files and xconfig-specific rc.conf.d overrides.
         preference=$(sysrc -s xconfig -n xconfig_gpu 2>/dev/null || true)
     fi
 
@@ -1033,16 +1045,12 @@ apply_amd_gpu() {
 }
 
 # Function: apply_nvidia_gpu
-# Description: Applies the NVIDIA configuration and clears stale DRM boot modules
+# Description: Applies the NVIDIA configuration
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if driver package installation fails
 # Usage: apply_nvidia_gpu
 apply_nvidia_gpu() {
     log INFO "Configuring NVIDIA GPU"
-    remove_fb
-    remove_from_kld_list "/boot/modules/i915kms.ko"
-    remove_from_kld_list "/boot/modules/amdgpu.ko"
-    remove_from_kld_list "/boot/modules/radeonkms.ko"
     nvidia_version=$(detect_nvidia_driver_version)
     log INFO "NVIDIA driver version needed: $nvidia_version"
     setup_nvidia_driver "$nvidia_version"
@@ -1167,8 +1175,7 @@ cmd_auto() {
                 return 1
             fi
             log INFO "Using explicitly selected NVIDIA GPU"
-            remove_drm
-            apply_nvidia_gpu
+            apply_nvidia_gpu || return 1
             return 0
             ;;
     esac
@@ -1188,12 +1195,13 @@ cmd_auto() {
         apply_amd_gpu
         return 0
     fi
-    remove_drm
-
     if [ "$nvidia_present" -eq 1 ]; then
-        apply_nvidia_gpu
+        apply_nvidia_gpu || return 1
         return 0
     fi
+
+    # Preserve cleanup when no supported physical GPU is detected.
+    remove_drm
 
     # Fallback
     log WARN "Could not identify a supported GPU or hypervisor. Falling back to framebuffer drivers"
