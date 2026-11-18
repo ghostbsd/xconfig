@@ -72,6 +72,30 @@ sudo xconfig auto
 
 Detects hardware and applies the best configuration (including NVIDIA/AMD/Intel and hypervisors).
 
+### Hybrid and multi-GPU systems
+
+Automatic detection uses PCI presence and keeps the existing Intel, AMD, then
+NVIDIA preference order. PCI presence does not identify which GPU drives the
+active display, so this order may not match the display path on hybrid laptops.
+
+Set `xconfig_gpu` to select a physical GPU when `xconfig auto` runs:
+
+* `auto` (default): use the existing automatic preference order.
+* `intel`: configure Intel DRM (`i915kms`).
+* `amd`: choose `amdgpu` or `radeonkms` based on the detected AMD device.
+* `nvidia`: detect the NVIDIA driver branch and configure the NVIDIA GPU.
+
+Values are case-sensitive and must be lowercase. Set
+`xconfig_gpu="nvidia"` in `/etc/rc.conf` or `/etc/rc.conf.d/xconfig` to
+persist the selection across boots. The `rc.d/xconfig` service runs
+`xconfig auto` during boot, so this setting prevents automatic detection from
+overriding the selected physical GPU. For a one-time test, use
+`sudo env XCONFIG_GPU=nvidia xconfig auto`; the environment variable takes
+precedence over the configured value.
+
+The preference applies only to physical GPUs. Hypervisor detection takes
+precedence and logs a warning when a non-`auto` preference is ignored.
+
 ### Interactive setup
 
 ```bash

@@ -985,6 +985,80 @@ run_interactive() {
 # Auto mode logic
 ###############################################################################
 
+# Function: get_gpu_preference
+# Description: Reads the physical GPU preference from the environment or rc.conf
+# Parameters: None
+# Returns: Outputs auto, intel, amd, or nvidia to stdout
+# Usage: gpu_preference=$(get_gpu_preference)
+get_gpu_preference() {
+    preference="${XCONFIG_GPU:-}"
+
+    if [ -z "$preference" ] && command -v sysrc >/dev/null 2>&1; then
+        preference=$(sysrc -s xconfig -n xconfig_gpu 2>/dev/null || true)
+    fi
+
+    if [ -z "$preference" ]; then
+        preference="auto"
+    fi
+
+    printf '%s\n' "$preference"
+}
+
+# Function: apply_intel_gpu
+# Description: Applies the Intel DRM configuration for the selected GPU
+# Parameters: None
+# Returns: None
+# Usage: apply_intel_gpu
+apply_intel_gpu() {
+    log INFO "Configuring Intel GPU"
+    remove_fb
+    setup_intel_drm
+}
+
+# Function: apply_amd_gpu
+# Description: Applies the appropriate AMD DRM configuration for the selected GPU
+# Parameters: None
+# Returns: None
+# Usage: apply_amd_gpu
+apply_amd_gpu() {
+    log INFO "Configuring AMD GPU"
+    remove_fb
+    if detect_radeon_device; then
+        log INFO "Using radeonkms for older AMD card (RADEON_DEVICE match)"
+        setup_radeonkms_drm
+    else
+        log INFO "Using amdgpu for modern AMD card"
+        setup_amdgpu_drm
+    fi
+}
+
+# Function: apply_nvidia_gpu
+# Description: Applies the NVIDIA configuration and clears stale DRM boot modules
+# Parameters: None
+# Returns: None
+# Usage: apply_nvidia_gpu
+apply_nvidia_gpu() {
+    log INFO "Configuring NVIDIA GPU"
+    remove_fb
+    remove_from_kld_list "/boot/modules/i915kms.ko"
+    remove_from_kld_list "/boot/modules/amdgpu.ko"
+    remove_from_kld_list "/boot/modules/radeonkms.ko"
+    nvidia_version=$(detect_nvidia_driver_version)
+    log INFO "NVIDIA driver version needed: $nvidia_version"
+    setup_nvidia_driver "$nvidia_version"
+}
+
+# Function: warn_gpu_preference_for_hypervisor
+# Description: Logs when a physical GPU preference is ignored for a VM
+# Parameters: None
+# Returns: None
+# Usage: warn_gpu_preference_for_hypervisor
+warn_gpu_preference_for_hypervisor() {
+    if [ "$gpu_preference" != "auto" ]; then
+        log WARN "Ignoring xconfig_gpu=$gpu_preference because hypervisor configuration takes precedence"
+    fi
+}
+
 # Function: cmd_auto
 # Description: Performs automatic hardware detection and applies optimal X11 configuration
 # Parameters: None
@@ -995,8 +1069,19 @@ cmd_auto() {
 
     log INFO "Detected X server: $(detect_x_server)"
 
-    # Hypervisors first
+    gpu_preference=$(get_gpu_preference)
+    case "$gpu_preference" in
+        auto|intel|amd|nvidia)
+            ;;
+        *)
+            log ERROR "Invalid xconfig_gpu value: $gpu_preference (expected auto, intel, amd, or nvidia; use lowercase)"
+            return 1
+            ;;
+    esac
+
+    # Hypervisors take precedence; xconfig_gpu applies to physical GPUs only.
     if detect_virtualbox; then
+        warn_gpu_preference_for_hypervisor
         log INFO "Detected VirtualBox guest"
         remove_vmware
         remove_drm
@@ -1007,6 +1092,7 @@ cmd_auto() {
     remove_virtualbox
 
     if detect_vmware; then
+        warn_gpu_preference_for_hypervisor
         log INFO "Detected VMware guest"
         remove_drm
         remove_fb
@@ -1016,6 +1102,7 @@ cmd_auto() {
     remove_vmware
 
     if detect_qemu; then
+        warn_gpu_preference_for_hypervisor
         log INFO "Detected QEMU/KVM guest"
         remove_drm
         setup_fb
@@ -1023,6 +1110,7 @@ cmd_auto() {
     fi
 
     if detect_hyperv; then
+        warn_gpu_preference_for_hypervisor
         log INFO "Detected Hyper-V guest"
         remove_drm
         setup_fb
@@ -1030,40 +1118,80 @@ cmd_auto() {
     fi
 
     if detect_bhyve; then
+        warn_gpu_preference_for_hypervisor
         log INFO "Detected bhyve guest"
         remove_drm
         setup_fb
         return 0
     fi
 
-    # Physical GPUs - Intel and AMD use DRM, NVIDIA does not
+    # Detect all physical GPUs before applying the selected policy.
+    intel_present=0
+    amd_present=0
+    nvidia_present=0
+
     if detect_intel_gpu; then
-        log INFO "Detected Intel GPU"
-        remove_fb
-        setup_intel_drm
+        intel_present=1
+    fi
+    if detect_amd_gpu; then
+        amd_present=1
+    fi
+    if detect_nvidia_gpu; then
+        nvidia_present=1
+    fi
+
+    # An explicit preference is useful when PCI presence does not identify
+    # which GPU drives the active display.
+    case "$gpu_preference" in
+        intel)
+            if [ "$intel_present" -ne 1 ]; then
+                log ERROR "xconfig_gpu=intel requested, but no Intel GPU was detected"
+                return 1
+            fi
+            log INFO "Using explicitly selected Intel GPU"
+            apply_intel_gpu
+            return 0
+            ;;
+        amd)
+            if [ "$amd_present" -ne 1 ]; then
+                log ERROR "xconfig_gpu=amd requested, but no AMD GPU was detected"
+                return 1
+            fi
+            log INFO "Using explicitly selected AMD GPU"
+            apply_amd_gpu
+            return 0
+            ;;
+        nvidia)
+            if [ "$nvidia_present" -ne 1 ]; then
+                log ERROR "xconfig_gpu=nvidia requested, but no NVIDIA GPU was detected"
+                return 1
+            fi
+            log INFO "Using explicitly selected NVIDIA GPU"
+            remove_drm
+            apply_nvidia_gpu
+            return 0
+            ;;
+    esac
+
+    # Automatic mode preserves the existing Intel -> AMD -> NVIDIA priority.
+    gpu_count=$((intel_present + amd_present + nvidia_present))
+    if [ "$gpu_count" -gt 1 ]; then
+        log WARN "Multiple GPUs detected; auto mode prefers Intel, then AMD, then NVIDIA. Set xconfig_gpu to select the display GPU explicitly."
+    fi
+
+    if [ "$intel_present" -eq 1 ]; then
+        apply_intel_gpu
         return 0
     fi
 
-    if detect_amd_gpu; then
-        log INFO "Detected AMD GPU"
-        remove_fb
-        if detect_radeon_device; then
-            log INFO "Using radeonkms for older AMD card (RADEON_DEVICE match)"
-            setup_radeonkms_drm
-        else
-            log INFO "Using amdgpu for modern AMD card"
-            setup_amdgpu_drm
-        fi
+    if [ "$amd_present" -eq 1 ]; then
+        apply_amd_gpu
         return 0
     fi
     remove_drm
 
-    if detect_nvidia_gpu; then
-        log INFO "Detected NVIDIA GPU"
-        remove_fb
-        nvidia_version=$(detect_nvidia_driver_version)
-        log INFO "NVIDIA driver version needed: $nvidia_version"
-        setup_nvidia_driver "$nvidia_version"
+    if [ "$nvidia_present" -eq 1 ]; then
+        apply_nvidia_gpu
         return 0
     fi
 
@@ -1142,6 +1270,7 @@ Usage: $SCRIPT_NAME <command>
 
 Commands:
   auto             Automatic detection and configuration (prefers DRM)
+                   Uses xconfig_gpu=auto|intel|amd|nvidia for physical GPUs
   setup            Interactive setup menu (same as manual)
   manual           Interactive setup using bsddialog or dialog
   debug            Print diagnostic information
@@ -1188,6 +1317,9 @@ Examples:
 
   # NVIDIA latest driver
   sudo $SCRIPT_NAME nvidia
+
+  # Select NVIDIA for automatic detection (also used by the boot service)
+  sudo env XCONFIG_GPU=nvidia $SCRIPT_NAME auto
 
   # NVIDIA legacy driver for older cards
   sudo $SCRIPT_NAME nvidia-470

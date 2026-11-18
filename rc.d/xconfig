@@ -8,6 +8,10 @@
 #
 # xconfig_enable="YES"
 #
+# Optional physical-GPU preference for xconfig auto:
+# xconfig_gpu="auto" # accepted values: auto, intel, amd, nvidia (lowercase)
+# Hypervisor detection takes precedence over this setting.
+#
 
 . /etc/rc.subr
 
