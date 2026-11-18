@@ -78,18 +78,24 @@ Automatic detection uses PCI presence and keeps the existing Intel, AMD, then
 NVIDIA preference order. PCI presence does not identify which GPU drives the
 active display, so this order may not match the display path on hybrid laptops.
 
-Set `xconfig_gpu` to select a physical GPU when `xconfig auto` runs:
+Set `xconfig_gpu` to choose which GPU driver stack
+`xconfig auto` configures:
 
 * `auto` (default): use the existing automatic preference order.
-* `intel`: configure Intel DRM (`i915kms`).
-* `amd`: choose `amdgpu` or `radeonkms` based on the detected AMD device.
-* `nvidia`: detect the NVIDIA driver branch and configure the NVIDIA GPU.
+* `intel`: configure the Intel DRM driver (`i915kms`).
+* `amd`: configure `amdgpu` or `radeonkms` based on the detected AMD device.
+* `nvidia`: detect the NVIDIA driver branch and configure its driver stack.
+
+This is a driver-setup preference, not an Xorg device-binding or display-routing
+setting. It does not guarantee which GPU Xorg will use or which GPU physically
+drives the display; Xorg's device probing and the system's display wiring or
+firmware still determine the active display path.
 
 Values are case-sensitive and must be lowercase. Set
 `xconfig_gpu="nvidia"` in `/etc/rc.conf` or `/etc/rc.conf.d/xconfig` to
-persist the selection across boots. The `rc.d/xconfig` service runs
-`xconfig auto` during boot, so this setting prevents automatic detection from
-overriding the selected physical GPU. For a one-time test, use
+persist the preference across boots. The `rc.d/xconfig` service runs
+`xconfig auto` during boot, so this setting applies the requested driver setup
+at boot. For a one-time test, use
 `sudo env XCONFIG_GPU=nvidia xconfig auto`; the environment variable takes
 precedence over the configured value.
 

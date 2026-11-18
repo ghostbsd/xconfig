@@ -434,17 +434,32 @@ add_to_kld_list() {
 }
 
 # Function: remove_from_kld_list
-# Description: Removes a kernel module from rc.conf kld_list
+# Description: Removes a kernel module from all system rc configuration files
 # Parameters:
 #   $1 - Module path
 # Returns: None
 # Usage: remove_from_kld_list "/boot/modules/amdgpu.ko"
 remove_from_kld_list() {
     module=$1
-    if grep -q "kld_list.*$module" /etc/rc.conf 2>/dev/null; then
-        log INFO "Removing $module from kld_list"
-        sysrc -f /etc/rc.conf kld_list-="$module"
+    rc_conf_files=$(sysrc -E -L 2>/dev/null || true)
+
+    if [ -z "$rc_conf_files" ]; then
+        rc_conf_files="/etc/rc.conf /etc/rc.conf.local"
     fi
+
+    printf '%s
+' "$rc_conf_files" |
+    while IFS= read -r rc_conf; do
+        [ -f "$rc_conf" ] || continue
+
+        if sysrc -f "$rc_conf" -n kld_list 2>/dev/null |
+            tr '[:space:]' '
+' |
+            grep -Fqx "$module"; then
+            log INFO "Removing $module from kld_list in $rc_conf"
+            sysrc -f "$rc_conf" "kld_list-=$module"
+        fi
+    done
 }
 
 # Function: detect_radeon_device
@@ -467,7 +482,7 @@ detect_radeon_device() {
 # Function: generate_nvidia_xorg_conf
 # Description: Generates NVIDIA xorg.conf using X -configure and patches it
 # Parameters: None
-# Returns: 0 on success, exits on failure
+# Returns: 0 on success, 1 if Xorg configuration generation fails
 # Usage: generate_nvidia_xorg_conf
 generate_nvidia_xorg_conf() {
     # Generate xorg.conf for NVIDIA using X -configure
@@ -481,7 +496,7 @@ generate_nvidia_xorg_conf() {
         log ERROR "  1. Run: shutdown now"
         log ERROR "  2. Run: xconfig"
         log ERROR "  3. Run: reboot"
-        exit 1
+        return 1
     fi
 
     /usr/local/bin/X -configure 2>&1 | tee -a "$LOG_FILE"
@@ -498,7 +513,7 @@ generate_nvidia_xorg_conf() {
         return 0
     else
         log ERROR "X -configure failed to create /root/xorg.conf.new"
-        exit 1
+        return 1
     fi
 }
 
@@ -674,11 +689,19 @@ detect_nvidia_driver_version() {
 # Description: Installs and configures NVIDIA driver for specified version
 # Parameters:
 #   $1 - Driver version (latest, 580, 470, 390, 340)
-# Returns: 1 if driver package installation fails; configuration errors may exit
+# Returns: 1 if package installation or Xorg configuration fails
 # Usage: setup_nvidia_driver "470"
 setup_nvidia_driver() {
     version=$1
     server=$(detect_x_server)
+
+    # X -configure requires the X server to be stopped. Check before changing
+    # packages or persistent boot settings so a failed run leaves them intact.
+    if pgrep -x Xorg >/dev/null 2>&1 || pgrep -x X >/dev/null 2>&1; then
+        log ERROR "Cannot configure NVIDIA while the X server is running"
+        log ERROR "Stop the graphical session before running xconfig"
+        return 1
+    fi
 
     # Determine package name
     if [ "$version" = "latest" ]; then
@@ -705,28 +728,30 @@ setup_nvidia_driver() {
         fi
     fi
 
-    # Remove framebuffer packages only after NVIDIA installation succeeds.
-    remove_fb
+    # Load the NVIDIA module for X -configure. This changes runtime state only.
+    # Persistent boot settings are left untouched until Xorg config succeeds.
+    if [ "$version" = "340" ]; then
+        nvidia_module="nvidia"
+    else
+        nvidia_module="nvidia-modeset"
+    fi
 
-    # Clear stale DRM boot modules only after the NVIDIA package is installed.
+    log INFO "Loading $nvidia_module kernel module"
+    kldload "$nvidia_module" 2>/dev/null || log WARN "$nvidia_module already loaded or failed"
+
+    # Generate Xorg configuration before committing persistent boot changes.
+    if ! generate_nvidia_xorg_conf; then
+        log ERROR "NVIDIA Xorg configuration failed; leaving boot configuration unchanged"
+        return 1
+    fi
+
+    # Apply package and boot cleanup only after Xorg configuration succeeds.
+    remove_fb
     remove_from_kld_list "/boot/modules/i915kms.ko"
     remove_from_kld_list "/boot/modules/amdgpu.ko"
     remove_from_kld_list "/boot/modules/radeonkms.ko"
+    sysrc -f /etc/rc.conf kldload_nvidia="$nvidia_module"
 
-    # Determine which kernel module to load
-    # Drivers 340 and 304 use "nvidia" module, not "nvidia-modeset"
-    if [ "$version" = "340" ]; then
-        log INFO "Loading nvidia kernel module (legacy driver)"
-        kldload nvidia 2>/dev/null || log WARN "nvidia already loaded or failed"
-        sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
-    else
-        log INFO "Loading nvidia-modeset kernel module"
-        kldload nvidia-modeset 2>/dev/null || log WARN "nvidia-modeset already loaded or failed"
-        sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
-    fi
-
-    # Generate NVIDIA xorg.conf
-    generate_nvidia_xorg_conf
     log INFO "NVIDIA driver configured"
 }
 
@@ -997,7 +1022,7 @@ run_interactive() {
 ###############################################################################
 
 # Function: get_gpu_preference
-# Description: Reads the physical GPU preference from the environment or rc.conf
+# Description: Reads the GPU driver preference from the environment or rc.conf
 # Parameters: None
 # Returns: Outputs auto, intel, amd, or nvidia to stdout
 # Usage: gpu_preference=$(get_gpu_preference)
@@ -1047,7 +1072,7 @@ apply_amd_gpu() {
 # Function: apply_nvidia_gpu
 # Description: Applies the NVIDIA configuration
 # Parameters: None
-# Returns: 0 on success, 1 if driver package installation fails
+# Returns: 0 on success, 1 if NVIDIA setup fails
 # Usage: apply_nvidia_gpu
 apply_nvidia_gpu() {
     log INFO "Configuring NVIDIA GPU"
@@ -1148,15 +1173,15 @@ cmd_auto() {
         nvidia_present=1
     fi
 
-    # An explicit preference is useful when PCI presence does not identify
-    # which GPU drives the active display.
+    # The preference chooses which vendor driver stack to configure; it
+    # does not bind Xorg to a PCI device or control physical display routing.
     case "$gpu_preference" in
         intel)
             if [ "$intel_present" -ne 1 ]; then
                 log ERROR "xconfig_gpu=intel requested, but no Intel GPU was detected"
                 return 1
             fi
-            log INFO "Using explicitly selected Intel GPU"
+            log INFO "Applying requested Intel driver setup"
             apply_intel_gpu
             return 0
             ;;
@@ -1165,7 +1190,7 @@ cmd_auto() {
                 log ERROR "xconfig_gpu=amd requested, but no AMD GPU was detected"
                 return 1
             fi
-            log INFO "Using explicitly selected AMD GPU"
+            log INFO "Applying requested AMD driver setup"
             apply_amd_gpu
             return 0
             ;;
@@ -1174,7 +1199,7 @@ cmd_auto() {
                 log ERROR "xconfig_gpu=nvidia requested, but no NVIDIA GPU was detected"
                 return 1
             fi
-            log INFO "Using explicitly selected NVIDIA GPU"
+            log INFO "Applying requested NVIDIA driver setup"
             apply_nvidia_gpu || return 1
             return 0
             ;;
@@ -1183,7 +1208,7 @@ cmd_auto() {
     # Automatic mode preserves the existing Intel -> AMD -> NVIDIA priority.
     gpu_count=$((intel_present + amd_present + nvidia_present))
     if [ "$gpu_count" -gt 1 ]; then
-        log WARN "Multiple GPUs detected; auto mode prefers Intel, then AMD, then NVIDIA. Set xconfig_gpu to select the display GPU explicitly."
+        log WARN "Multiple GPUs detected; auto mode prefers Intel, then AMD, then NVIDIA. Set xconfig_gpu to choose the driver setup to apply."
     fi
 
     if [ "$intel_present" -eq 1 ]; then
@@ -1278,7 +1303,7 @@ Usage: $SCRIPT_NAME <command>
 
 Commands:
   auto             Automatic detection and configuration (prefers DRM)
-                   Uses xconfig_gpu=auto|intel|amd|nvidia for physical GPUs
+                   Uses xconfig_gpu=auto|intel|amd|nvidia to choose a driver setup
   setup            Interactive setup menu (same as manual)
   manual           Interactive setup using bsddialog or dialog
   debug            Print diagnostic information
@@ -1356,6 +1381,16 @@ main() {
     if [ "$(id -u)" -ne 0 ]; then
         log ERROR "This script must be run as root (use sudo)"
         exit 1
+    fi
+
+    # Serialize all xconfig invocations so boot and manual runs cannot
+    # interleave changes to kernel modules or /etc/X11/xorg.conf.
+    if [ "${XCONFIG_LOCKED:-NO}" != "YES" ]; then
+        if ! command -v lockf >/dev/null 2>&1; then
+            log ERROR "lockf is required to serialize xconfig operations"
+            exit 1
+        fi
+        exec lockf -k /var/run/xconfig.lock env XCONFIG_LOCKED=YES "$0" "$@"
     fi
 
     cmd="${1:-auto}"
