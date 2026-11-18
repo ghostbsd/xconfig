@@ -8,6 +8,11 @@
 #
 # xconfig_enable="YES"
 #
+# Optional GPU driver preference for xconfig auto:
+# xconfig_gpu="auto" # accepted values: auto, intel, amd, nvidia (lowercase)
+# This chooses the driver setup; it does not bind Xorg to a display device.
+# Hypervisor detection takes precedence over this setting.
+#
 
 . /etc/rc.subr
 
