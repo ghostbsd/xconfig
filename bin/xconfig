@@ -371,7 +371,7 @@ detect_bhyve() {
 # Returns: 0 if Intel GPU detected, 1 otherwise
 # Usage: if detect_intel_gpu; then ...
 detect_intel_gpu() {
-    if pciconf -lv 2>/dev/null | grep -B4 -E "VGA" | grep -qi "Intel"; then
+    if pciconf -lv 2>/dev/null | grep -B4 -E "subclass *= *(VGA|3D)" | grep -qi "Intel"; then
         return 0
     fi
     return 1
@@ -383,7 +383,7 @@ detect_intel_gpu() {
 # Returns: 0 if AMD/ATI GPU detected, 1 otherwise
 # Usage: if detect_amd_gpu; then ...
 detect_amd_gpu() {
-    if pciconf -lv 2>/dev/null | grep -B4 -E "VGA" | grep -Eq "AMD|ATI"; then
+    if pciconf -lv 2>/dev/null | grep -B4 -E "subclass *= *(VGA|3D)" | grep -Eq "AMD|ATI"; then
         return 0
     fi
     return 1
@@ -395,7 +395,7 @@ detect_amd_gpu() {
 # Returns: 0 if NVIDIA GPU detected, 1 otherwise
 # Usage: if detect_nvidia_gpu; then ...
 detect_nvidia_gpu() {
-    if pciconf -lv 2>/dev/null | grep -B4 -E "VGA" | grep -qi "NVIDIA"; then
+    if pciconf -lv 2>/dev/null | grep -B4 -E "subclass *= *(VGA|3D)" | grep -qi "NVIDIA"; then
         return 0
     fi
     return 1
@@ -454,7 +454,7 @@ remove_from_kld_list() {
 # Usage: if detect_radeon_device; then setup_radeonkms_drm; else setup_amdgpu_drm; fi
 detect_radeon_device() {
     # Check if AMD GPU matches RADEON_DEVICE list (older AMD cards that need radeonkms)
-    if pciconf -lv 2>/dev/null | grep -B 4 VGA | grep -q -E "($RADEON_DEVICE)"; then
+    if pciconf -lv 2>/dev/null | grep -B5 -E "subclass *= *(VGA|3D)" | grep -q -E "($RADEON_DEVICE)"; then
         return 0  # Radeon device found - use radeonkms
     fi
     return 1  # Not a radeon device - use amdgpu
@@ -640,27 +640,27 @@ setup_ati_legacy() {
 detect_nvidia_driver_version() {
     # Check which NVIDIA driver version is needed based on detected card
     # Check from newest to oldest to prevent newer cards matching legacy drivers
-    if pciconf -lv | grep -B 3 VGA | grep -q -E "($NVIDIA_LATEST_CARDS)"; then
+    if pciconf -lv | grep -B4 -E "subclass *= *(VGA|3D)" | grep -q -E "($NVIDIA_LATEST_CARDS)"; then
         echo "latest"
         return 0
     fi
 
-    if pciconf -lv | grep -B 3 VGA | grep -q -E "($NVIDIA_580_CARDS)"; then
+    if pciconf -lv | grep -B4 -E "subclass *= *(VGA|3D)" | grep -q -E "($NVIDIA_580_CARDS)"; then
         echo "580"
         return 0
     fi
 
-    if pciconf -lv | grep -B 3 VGA | grep -q -E "($NVIDIA_470_CARDS)"; then
+    if pciconf -lv | grep -B4 -E "subclass *= *(VGA|3D)" | grep -q -E "($NVIDIA_470_CARDS)"; then
         echo "470"
         return 0
     fi
 
-    if pciconf -lv | grep -B 3 VGA | grep -q -E "($NVIDIA_390_CARDS)"; then
+    if pciconf -lv | grep -B4 -E "subclass *= *(VGA|3D)" | grep -q -E "($NVIDIA_390_CARDS)"; then
         echo "390"
         return 0
     fi
 
-    if pciconf -lv | grep -B 3 VGA | grep -q -E "($NVIDIA_340_CARDS)"; then
+    if pciconf -lv | grep -B4 -E "subclass *= *(VGA|3D)" | grep -q -E "($NVIDIA_340_CARDS)"; then
         echo "340"
         return 0
     fi
@@ -1099,7 +1099,7 @@ cmd_debug() {
     echo
 
     echo "Detected GPUs (pciconf):"
-    pciconf -lv 2>/dev/null | grep -B4 -E "VGA" || echo "No VGA/display controllers found"
+    pciconf -lv 2>/dev/null | grep -B4 -E "subclass *= *(VGA|3D)" || echo "No VGA/3D display controllers found"
     echo
 
     echo "X server detection:"

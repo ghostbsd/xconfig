@@ -17,6 +17,7 @@
 * **Intel**: `i915kms` (auto or with external config)
 * **AMD**: `amdgpu` (modern) and `radeonkms` (legacy)
 * **NVIDIA**: auto classifies to a supported branch (e.g., `nvidia-driver-580/470/390/340/304`)
+* **PCI detection**: considers devices with the `VGA` or `3D` subclass
 * **Generic**: `vesa`, `scfb` (syscons framebuffer)
 
 ### Virtualization
