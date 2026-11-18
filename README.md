@@ -53,6 +53,11 @@ cd xconfig
 # Install the script
 sudo install -m 755 bin/xconfig /usr/local/bin/xconfig
 
+# Install and enable the boot-time configuration service
+sudo install -d -m 755 /usr/local/etc/rc.d
+sudo install -m 555 rc.d/xconfig /usr/local/etc/rc.d/xconfig
+sudo sysrc xconfig_enable="YES"
+
 # Install external config templates (system-wide)
 sudo mkdir -p /usr/local/etc/X11/cardDetect
 sudo cp -r cardDetect/* /usr/local/etc/X11/cardDetect/

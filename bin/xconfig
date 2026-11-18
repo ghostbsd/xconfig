@@ -170,14 +170,20 @@ find_config_dir() {
 # Function: backup_xorg_conf
 # Description: Creates a timestamped backup of existing xorg.conf
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if the backup cannot be created
 # Usage: backup_xorg_conf
 backup_xorg_conf() {
     if [ -f "$XORG_CONF" ]; then
-        mkdir -p "$BACKUP_DIR"
+        if ! mkdir -p "$BACKUP_DIR"; then
+            log ERROR "Cannot create Xorg backup directory: $BACKUP_DIR"
+            return 1
+        fi
         ts=$(date '+%Y%m%d_%H%M%S')
         backup="$BACKUP_DIR/xorg.conf.$ts"
-        cp "$XORG_CONF" "$backup"
+        if ! cp "$XORG_CONF" "$backup"; then
+            log ERROR "Failed to back up $XORG_CONF to $backup"
+            return 1
+        fi
         log INFO "Backed up existing $XORG_CONF to $backup"
     fi
 }
@@ -405,60 +411,100 @@ detect_nvidia_gpu() {
 # DRM Kernel Module Management
 ###############################################################################
 
+# Function: load_kernel_module
+# Description: Loads a kernel module, treating an already-loaded module as success
+# Parameters:
+#   $1 - Module name or path
+# Returns: 0 if loaded/already loaded, 1 on load failure
+# Usage: load_kernel_module "/boot/modules/i915kms.ko"
+load_kernel_module() {
+    module=$1
+    module_name=${module##*/}
+    module_name=${module_name%.ko}
+
+    if kldstat -q -m "$module_name" >/dev/null 2>&1 ||
+        kldstat -q -n "$module" >/dev/null 2>&1; then
+        log INFO "Kernel module already loaded: $module"
+        return 0
+    fi
+
+    log INFO "Loading kernel module: $module"
+    if kldload "$module" 2>/dev/null; then
+        return 0
+    fi
+
+    # Recheck in case another subsystem loaded it between the first check
+    # and kldload.
+    if kldstat -q -m "$module_name" >/dev/null 2>&1 ||
+        kldstat -q -n "$module" >/dev/null 2>&1; then
+        log INFO "Kernel module became available: $module"
+        return 0
+    fi
+
+    log ERROR "Failed to load kernel module: $module"
+    return 1
+}
+
 # Function: load_drm_module
 # Description: Loads a DRM kernel module immediately
 # Parameters:
-#   $1 - Module path (e.g., "/boot/modules/i915kms.ko")
-# Returns: None (logs warning if module already loaded or fails)
+#   $1 - Module path
+# Returns: 0 on success, 1 on failure
 # Usage: load_drm_module "/boot/modules/i915kms.ko"
 load_drm_module() {
-    module=$1
-    log INFO "Loading DRM module: $module"
-    kldload "$module" 2>/dev/null || log WARN "Module $module already loaded or failed to load"
+    load_kernel_module "$1"
 }
 
 # Function: add_to_kld_list
 # Description: Adds a kernel module to rc.conf kld_list for auto-loading at boot
 # Parameters:
 #   $1 - Module path
-# Returns: None
+# Returns: 0 on success, 1 if the rc configuration cannot be updated
 # Usage: add_to_kld_list "/boot/modules/i915kms.ko"
 add_to_kld_list() {
     module=$1
-    if grep -q "kld_list.*$module" /etc/rc.conf 2>/dev/null; then
-        log INFO "$module already in kld_list"
-    else
-        log INFO "Adding $module to kld_list"
-        sysrc -f /etc/rc.conf kld_list+="$module"
-    fi
+    current_kld_list=$(sysrc -n kld_list 2>/dev/null || true)
+
+    case " $current_kld_list " in
+        *" $module "*)
+            log INFO "$module already in kld_list"
+            ;;
+        *)
+            log INFO "Adding $module to kld_list"
+            if ! sysrc -f /etc/rc.conf "kld_list+=$module"; then
+                log ERROR "Failed to add $module to kld_list"
+                return 1
+            fi
+            ;;
+    esac
 }
 
 # Function: remove_from_kld_list
 # Description: Removes a kernel module from all system rc configuration files
 # Parameters:
 #   $1 - Module path
-# Returns: None
+# Returns: 0 on success, 1 if configuration discovery or an edit fails
 # Usage: remove_from_kld_list "/boot/modules/amdgpu.ko"
 remove_from_kld_list() {
     module=$1
-    rc_conf_files=$(sysrc -E -L 2>/dev/null || true)
-
-    if [ -z "$rc_conf_files" ]; then
-        rc_conf_files="/etc/rc.conf /etc/rc.conf.local"
+    if ! rc_conf_files=$(sysrc -E -L 2>/dev/null); then
+        log ERROR "Failed to list rc configuration files while removing $module"
+        return 1
     fi
 
-    printf '%s
-' "$rc_conf_files" |
-    while IFS= read -r rc_conf; do
+    for rc_conf in $rc_conf_files; do
         [ -f "$rc_conf" ] || continue
+        configured_kld_list=$(sysrc -f "$rc_conf" -n kld_list 2>/dev/null || true)
 
-        if sysrc -f "$rc_conf" -n kld_list 2>/dev/null |
-            tr '[:space:]' '
-' |
-            grep -Fqx "$module"; then
-            log INFO "Removing $module from kld_list in $rc_conf"
-            sysrc -f "$rc_conf" "kld_list-=$module"
-        fi
+        case " $configured_kld_list " in
+            *" $module "*)
+                log INFO "Removing $module from kld_list in $rc_conf"
+                if ! sysrc -f "$rc_conf" "kld_list-=$module"; then
+                    log ERROR "Failed to remove $module from kld_list in $rc_conf"
+                    return 1
+                fi
+                ;;
+        esac
     done
 }
 
@@ -485,36 +531,55 @@ detect_radeon_device() {
 # Returns: 0 on success, 1 if Xorg configuration generation fails
 # Usage: generate_nvidia_xorg_conf
 generate_nvidia_xorg_conf() {
-    # Generate xorg.conf for NVIDIA using X -configure
-    # This replaces generic drivers (nv, scfb, vesa) with nvidia driver
     log INFO "Generating NVIDIA xorg.conf with X -configure"
 
-    # X -configure requires X server to be stopped
+    # X -configure requires X server to be stopped.
     if pgrep -x Xorg >/dev/null 2>&1 || pgrep -x X >/dev/null 2>&1; then
         log ERROR "Cannot run X -configure while X server is running"
-        log ERROR "Please shutdown to single-user mode, then run xconfig:"
-        log ERROR "  1. Run: shutdown now"
-        log ERROR "  2. Run: xconfig"
-        log ERROR "  3. Run: reboot"
+        log ERROR "Please stop the graphical session before running xconfig"
         return 1
     fi
 
-    /usr/local/bin/X -configure 2>&1 | tee -a "$LOG_FILE"
-    if [ -f /root/xorg.conf.new ]; then
-        log INFO "Replacing generic drivers with nvidia driver"
-        sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
-        sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
-        sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
-
-        backup_xorg_conf
-        mkdir -p /etc/X11
-        cp /root/xorg.conf.new /etc/X11/xorg.conf
-        log INFO "NVIDIA xorg.conf generated and installed"
-        return 0
-    else
-        log ERROR "X -configure failed to create /root/xorg.conf.new"
+    # Never accept a stale configuration from a previous attempt.
+    if ! rm -f /root/xorg.conf.new; then
+        log ERROR "Cannot remove stale /root/xorg.conf.new"
         return 1
     fi
+
+    # Do not pipe through tee: that would hide the X command's exit status.
+    if ! /usr/local/bin/X -configure >> "$LOG_FILE" 2>&1; then
+        log ERROR "X -configure failed (see $LOG_FILE)"
+        rm -f /root/xorg.conf.new
+        return 1
+    fi
+
+    if [ ! -s /root/xorg.conf.new ]; then
+        log ERROR "X -configure did not create a non-empty /root/xorg.conf.new"
+        return 1
+    fi
+
+    log INFO "Replacing generic drivers with nvidia driver"
+    if ! sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new ||
+        ! sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new ||
+        ! sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new; then
+        log ERROR "Failed to update NVIDIA driver entries in /root/xorg.conf.new"
+        return 1
+    fi
+
+    if ! backup_xorg_conf; then
+        return 1
+    fi
+    if ! mkdir -p /etc/X11; then
+        log ERROR "Cannot create /etc/X11"
+        return 1
+    fi
+    if ! cp /root/xorg.conf.new /etc/X11/xorg.conf; then
+        log ERROR "Failed to install NVIDIA Xorg configuration"
+        return 1
+    fi
+
+    log INFO "NVIDIA xorg.conf generated and installed"
+    return 0
 }
 
 ###############################################################################
@@ -524,15 +589,17 @@ generate_nvidia_xorg_conf() {
 # Function: cleanup_nvidia_config
 # Description: Removes NVIDIA configuration when switching to DRM drivers
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if NVIDIA boot configuration cannot be removed
 # Usage: cleanup_nvidia_config
 cleanup_nvidia_config() {
-    # Remove NVIDIA boot config if present (used when switching from NVIDIA to DRM)
     if sysrc -n kldload_nvidia >/dev/null 2>&1; then
         log INFO "Removing kldload_nvidia from rc.conf"
-        sysrc -x kldload_nvidia
+        if ! sysrc -x kldload_nvidia; then
+            log ERROR "Failed to remove kldload_nvidia from rc.conf"
+            return 1
+        fi
     fi
-    # Unload NVIDIA modules if loaded
+
     if kldstat | grep -q nvidia-modeset; then
         log INFO "Unloading nvidia-modeset module"
         kldunload nvidia-modeset 2>/dev/null || log WARN "Failed to unload nvidia-modeset"
@@ -546,51 +613,60 @@ cleanup_nvidia_config() {
 # Function: setup_intel_drm
 # Description: Configures Intel graphics using modern DRM (i915kms kernel module)
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if module or rc configuration setup fails
 # Usage: setup_intel_drm
 setup_intel_drm() {
     log INFO "Setting up Intel DRM (i915kms)"
-    cleanup_nvidia_config
-    load_drm_module "/boot/modules/i915kms.ko"
-    add_to_kld_list "/boot/modules/i915kms.ko"
-    remove_from_kld_list "/boot/modules/amdgpu.ko"
-    remove_from_kld_list "/boot/modules/radeonkms.ko"
-    backup_xorg_conf
-    rm -f "$XORG_CONF"
+    cleanup_nvidia_config || return 1
+    load_drm_module "/boot/modules/i915kms.ko" || return 1
+    add_to_kld_list "/boot/modules/i915kms.ko" || return 1
+    remove_from_kld_list "/boot/modules/amdgpu.ko" || return 1
+    remove_from_kld_list "/boot/modules/radeonkms.ko" || return 1
+    backup_xorg_conf || return 1
+    if ! rm -f "$XORG_CONF"; then
+        log ERROR "Failed to remove old Xorg configuration: $XORG_CONF"
+        return 1
+    fi
     log INFO "Intel DRM configured - modesetting driver will auto-detect"
 }
 
 # Function: setup_amdgpu_drm
 # Description: Configures modern AMD graphics using DRM (amdgpu kernel module)
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if module or rc configuration setup fails
 # Usage: setup_amdgpu_drm
 setup_amdgpu_drm() {
     log INFO "Setting up AMD DRM (amdgpu - modern cards)"
-    cleanup_nvidia_config
-    load_drm_module "/boot/modules/amdgpu.ko"
-    add_to_kld_list "/boot/modules/amdgpu.ko"
-    remove_from_kld_list "/boot/modules/radeonkms.ko"
-    remove_from_kld_list "/boot/modules/i915kms.ko"
-    backup_xorg_conf
-    rm -f "$XORG_CONF"
+    cleanup_nvidia_config || return 1
+    load_drm_module "/boot/modules/amdgpu.ko" || return 1
+    add_to_kld_list "/boot/modules/amdgpu.ko" || return 1
+    remove_from_kld_list "/boot/modules/radeonkms.ko" || return 1
+    remove_from_kld_list "/boot/modules/i915kms.ko" || return 1
+    backup_xorg_conf || return 1
+    if ! rm -f "$XORG_CONF"; then
+        log ERROR "Failed to remove old Xorg configuration: $XORG_CONF"
+        return 1
+    fi
     log INFO "amdgpu DRM configured - modesetting driver will auto-detect"
 }
 
 # Function: setup_radeonkms_drm
 # Description: Configures older AMD graphics using DRM (radeonkms kernel module)
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if module or rc configuration setup fails
 # Usage: setup_radeonkms_drm
 setup_radeonkms_drm() {
     log INFO "Setting up AMD DRM (radeonkms - older AMD cards)"
-    cleanup_nvidia_config
-    load_drm_module "/boot/modules/radeonkms.ko"
-    add_to_kld_list "/boot/modules/radeonkms.ko"
-    remove_from_kld_list "/boot/modules/amdgpu.ko"
-    remove_from_kld_list "/boot/modules/i915kms.ko"
-    backup_xorg_conf
-    rm -f "$XORG_CONF"
+    cleanup_nvidia_config || return 1
+    load_drm_module "/boot/modules/radeonkms.ko" || return 1
+    add_to_kld_list "/boot/modules/radeonkms.ko" || return 1
+    remove_from_kld_list "/boot/modules/amdgpu.ko" || return 1
+    remove_from_kld_list "/boot/modules/i915kms.ko" || return 1
+    backup_xorg_conf || return 1
+    if ! rm -f "$XORG_CONF"; then
+        log ERROR "Failed to remove old Xorg configuration: $XORG_CONF"
+        return 1
+    fi
     log INFO "radeonkms DRM configured - modesetting driver will auto-detect"
 }
 
@@ -737,7 +813,7 @@ setup_nvidia_driver() {
     fi
 
     log INFO "Loading $nvidia_module kernel module"
-    kldload "$nvidia_module" 2>/dev/null || log WARN "$nvidia_module already loaded or failed"
+    load_kernel_module "$nvidia_module" || return 1
 
     # Generate Xorg configuration before committing persistent boot changes.
     if ! generate_nvidia_xorg_conf; then
@@ -747,10 +823,13 @@ setup_nvidia_driver() {
 
     # Apply package and boot cleanup only after Xorg configuration succeeds.
     remove_fb
-    remove_from_kld_list "/boot/modules/i915kms.ko"
-    remove_from_kld_list "/boot/modules/amdgpu.ko"
-    remove_from_kld_list "/boot/modules/radeonkms.ko"
-    sysrc -f /etc/rc.conf kldload_nvidia="$nvidia_module"
+    remove_from_kld_list "/boot/modules/i915kms.ko" || return 1
+    remove_from_kld_list "/boot/modules/amdgpu.ko" || return 1
+    remove_from_kld_list "/boot/modules/radeonkms.ko" || return 1
+    if ! sysrc -f /etc/rc.conf "kldload_nvidia=$nvidia_module"; then
+        log ERROR "Failed to persist kldload_nvidia=$nvidia_module"
+        return 1
+    fi
 
     log INFO "NVIDIA driver configured"
 }
@@ -1022,7 +1101,7 @@ run_interactive() {
 ###############################################################################
 
 # Function: get_gpu_preference
-# Description: Reads the GPU driver preference from the environment or rc.conf
+# Description: Reads GPU preference from the environment and effective rc files
 # Parameters: None
 # Returns: Outputs auto, intel, amd, or nvidia to stdout
 # Usage: gpu_preference=$(get_gpu_preference)
@@ -1030,8 +1109,19 @@ get_gpu_preference() {
     preference="${XCONFIG_GPU:-}"
 
     if [ -z "$preference" ] && command -v sysrc >/dev/null 2>&1; then
-        # Read global rc.conf files and xconfig-specific rc.conf.d overrides.
-        preference=$(sysrc -s xconfig -n xconfig_gpu 2>/dev/null || true)
+        # -s xconfig -l lists the global rc files plus xconfig rc.conf.d overrides.
+        # Read each file explicitly so the last service-specific value wins.
+        if ! rc_conf_files=$(sysrc -E -s xconfig -l 2>/dev/null); then
+            rc_conf_files=$(sysrc -E -l 2>/dev/null || true)
+        fi
+
+        for rc_conf in $rc_conf_files; do
+            [ -f "$rc_conf" ] || continue
+            rc_preference=$(sysrc -f "$rc_conf" -n xconfig_gpu 2>/dev/null || true)
+            if [ -n "$rc_preference" ]; then
+                preference=$rc_preference
+            fi
+        done
     fi
 
     if [ -z "$preference" ]; then
@@ -1044,28 +1134,28 @@ get_gpu_preference() {
 # Function: apply_intel_gpu
 # Description: Applies the Intel DRM configuration for the selected GPU
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if driver setup fails
 # Usage: apply_intel_gpu
 apply_intel_gpu() {
     log INFO "Configuring Intel GPU"
     remove_fb
-    setup_intel_drm
+    setup_intel_drm || return 1
 }
 
 # Function: apply_amd_gpu
 # Description: Applies the appropriate AMD DRM configuration for the selected GPU
 # Parameters: None
-# Returns: None
+# Returns: 0 on success, 1 if driver setup fails
 # Usage: apply_amd_gpu
 apply_amd_gpu() {
     log INFO "Configuring AMD GPU"
     remove_fb
     if detect_radeon_device; then
         log INFO "Using radeonkms for older AMD card (RADEON_DEVICE match)"
-        setup_radeonkms_drm
+        setup_radeonkms_drm || return 1
     else
         log INFO "Using amdgpu for modern AMD card"
-        setup_amdgpu_drm
+        setup_amdgpu_drm || return 1
     fi
 }
 
@@ -1182,7 +1272,7 @@ cmd_auto() {
                 return 1
             fi
             log INFO "Applying requested Intel driver setup"
-            apply_intel_gpu
+            apply_intel_gpu || return 1
             return 0
             ;;
         amd)
@@ -1191,7 +1281,7 @@ cmd_auto() {
                 return 1
             fi
             log INFO "Applying requested AMD driver setup"
-            apply_amd_gpu
+            apply_amd_gpu || return 1
             return 0
             ;;
         nvidia)
@@ -1212,12 +1302,12 @@ cmd_auto() {
     fi
 
     if [ "$intel_present" -eq 1 ]; then
-        apply_intel_gpu
+        apply_intel_gpu || return 1
         return 0
     fi
 
     if [ "$amd_present" -eq 1 ]; then
-        apply_amd_gpu
+        apply_amd_gpu || return 1
         return 0
     fi
     if [ "$nvidia_present" -eq 1 ]; then
@@ -1376,23 +1466,7 @@ EOF
 #   $@ - Command-line arguments (command name and options)
 # Returns: None (exits with status code)
 # Usage: main "$@"
-main() {
-    # Check for root privileges
-    if [ "$(id -u)" -ne 0 ]; then
-        log ERROR "This script must be run as root (use sudo)"
-        exit 1
-    fi
-
-    # Serialize all xconfig invocations so boot and manual runs cannot
-    # interleave changes to kernel modules or /etc/X11/xorg.conf.
-    if [ "${XCONFIG_LOCKED:-NO}" != "YES" ]; then
-        if ! command -v lockf >/dev/null 2>&1; then
-            log ERROR "lockf is required to serialize xconfig operations"
-            exit 1
-        fi
-        exec lockf -k /var/run/xconfig.lock env XCONFIG_LOCKED=YES "$0" "$@"
-    fi
-
+main_locked() {
     cmd="${1:-auto}"
 
     case "$cmd" in
@@ -1464,6 +1538,24 @@ main() {
     esac
 
     remove_xdrivers
+}
+
+main() {
+    if [ "$(id -u)" -ne 0 ]; then
+        log ERROR "This script must be run as root (use sudo)"
+        exit 1
+    fi
+
+    # Lock the open file descriptor for the entire configuration run.
+    # The lock is held by this subshell until it exits; no environment flag
+    # can skip acquisition.
+    (
+        if ! lockf -s 9; then
+            log ERROR "Failed to acquire the xconfig system lock"
+            exit 1
+        fi
+        main_locked "$@"
+    ) 9>>/var/run/xconfig.lock
 }
 
 main "$@"
