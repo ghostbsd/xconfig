@@ -487,6 +487,9 @@ add_to_kld_list() {
 # Usage: remove_from_kld_list "/boot/modules/amdgpu.ko"
 remove_from_kld_list() {
     module=$1
+    module_name=${module##*/}
+    module_name=${module_name%.ko}
+
     if ! rc_conf_files=$(sysrc -E -L 2>/dev/null); then
         log ERROR "Failed to list rc configuration files while removing $module"
         return 1
@@ -496,15 +499,18 @@ remove_from_kld_list() {
         [ -f "$rc_conf" ] || continue
         configured_kld_list=$(sysrc -f "$rc_conf" -n kld_list 2>/dev/null || true)
 
-        case " $configured_kld_list " in
-            *" $module "*)
-                log INFO "Removing $module from kld_list in $rc_conf"
-                if ! sysrc -f "$rc_conf" "kld_list-=$module"; then
-                    log ERROR "Failed to remove $module from kld_list in $rc_conf"
+        for configured_module in $configured_kld_list; do
+            configured_module_name=${configured_module##*/}
+            configured_module_name=${configured_module_name%.ko}
+
+            if [ "$configured_module_name" = "$module_name" ]; then
+                log INFO "Removing $configured_module from kld_list in $rc_conf"
+                if ! sysrc -f "$rc_conf" "kld_list-=$configured_module"; then
+                    log ERROR "Failed to remove $configured_module from kld_list in $rc_conf"
                     return 1
                 fi
-                ;;
-        esac
+            fi
+        done
     done
 }
 
@@ -566,19 +572,7 @@ generate_nvidia_xorg_conf() {
         return 1
     fi
 
-    if ! backup_xorg_conf; then
-        return 1
-    fi
-    if ! mkdir -p /etc/X11; then
-        log ERROR "Cannot create /etc/X11"
-        return 1
-    fi
-    if ! cp /root/xorg.conf.new /etc/X11/xorg.conf; then
-        log ERROR "Failed to install NVIDIA Xorg configuration"
-        return 1
-    fi
-
-    log INFO "NVIDIA xorg.conf generated and installed"
+    log INFO "NVIDIA xorg.conf generated and validated at /root/xorg.conf.new"
     return 0
 }
 
@@ -617,8 +611,8 @@ cleanup_nvidia_config() {
 # Usage: setup_intel_drm
 setup_intel_drm() {
     log INFO "Setting up Intel DRM (i915kms)"
-    cleanup_nvidia_config || return 1
     load_drm_module "/boot/modules/i915kms.ko" || return 1
+    cleanup_nvidia_config || return 1
     add_to_kld_list "/boot/modules/i915kms.ko" || return 1
     remove_from_kld_list "/boot/modules/amdgpu.ko" || return 1
     remove_from_kld_list "/boot/modules/radeonkms.ko" || return 1
@@ -637,8 +631,8 @@ setup_intel_drm() {
 # Usage: setup_amdgpu_drm
 setup_amdgpu_drm() {
     log INFO "Setting up AMD DRM (amdgpu - modern cards)"
-    cleanup_nvidia_config || return 1
     load_drm_module "/boot/modules/amdgpu.ko" || return 1
+    cleanup_nvidia_config || return 1
     add_to_kld_list "/boot/modules/amdgpu.ko" || return 1
     remove_from_kld_list "/boot/modules/radeonkms.ko" || return 1
     remove_from_kld_list "/boot/modules/i915kms.ko" || return 1
@@ -657,8 +651,8 @@ setup_amdgpu_drm() {
 # Usage: setup_radeonkms_drm
 setup_radeonkms_drm() {
     log INFO "Setting up AMD DRM (radeonkms - older AMD cards)"
-    cleanup_nvidia_config || return 1
     load_drm_module "/boot/modules/radeonkms.ko" || return 1
+    cleanup_nvidia_config || return 1
     add_to_kld_list "/boot/modules/radeonkms.ko" || return 1
     remove_from_kld_list "/boot/modules/amdgpu.ko" || return 1
     remove_from_kld_list "/boot/modules/i915kms.ko" || return 1
@@ -815,23 +809,55 @@ setup_nvidia_driver() {
     log INFO "Loading $nvidia_module kernel module"
     load_kernel_module "$nvidia_module" || return 1
 
-    # Generate Xorg configuration before committing persistent boot changes.
+    # Generate and validate Xorg configuration without replacing the active
+    # file yet. Keep the current configuration until all boot edits succeed.
     if ! generate_nvidia_xorg_conf; then
         log ERROR "NVIDIA Xorg configuration failed; leaving boot configuration unchanged"
         return 1
     fi
 
-    # Apply package and boot cleanup only after Xorg configuration succeeds.
+    if ! backup_xorg_conf; then
+        return 1
+    fi
+    if ! mkdir -p /etc/X11; then
+        log ERROR "Cannot create /etc/X11"
+        return 1
+    fi
+
+    nvidia_xorg_stage="/etc/X11/.xorg.conf.xconfig.$$"
+    if ! cp /root/xorg.conf.new "$nvidia_xorg_stage"; then
+        log ERROR "Failed to stage NVIDIA Xorg configuration"
+        return 1
+    fi
+
+    # Apply package and boot cleanup before committing the staged Xorg file.
     remove_fb
-    remove_from_kld_list "/boot/modules/i915kms.ko" || return 1
-    remove_from_kld_list "/boot/modules/amdgpu.ko" || return 1
-    remove_from_kld_list "/boot/modules/radeonkms.ko" || return 1
+    if ! remove_from_kld_list "/boot/modules/i915kms.ko"; then
+        rm -f "$nvidia_xorg_stage"
+        return 1
+    fi
+    if ! remove_from_kld_list "/boot/modules/amdgpu.ko"; then
+        rm -f "$nvidia_xorg_stage"
+        return 1
+    fi
+    if ! remove_from_kld_list "/boot/modules/radeonkms.ko"; then
+        rm -f "$nvidia_xorg_stage"
+        return 1
+    fi
     if ! sysrc -f /etc/rc.conf "kldload_nvidia=$nvidia_module"; then
+        rm -f "$nvidia_xorg_stage"
         log ERROR "Failed to persist kldload_nvidia=$nvidia_module"
         return 1
     fi
 
-    log INFO "NVIDIA driver configured"
+    # Commit the Xorg configuration only after every boot-setting edit passes.
+    if ! mv -f "$nvidia_xorg_stage" "$XORG_CONF"; then
+        rm -f "$nvidia_xorg_stage"
+        log ERROR "Failed to install staged NVIDIA Xorg configuration"
+        return 1
+    fi
+
+    log INFO "NVIDIA driver and boot configuration completed"
 }
 
 # Function: setup_nvidia

@@ -17,7 +17,6 @@
 * **Intel**: `i915kms` (auto or with external config)
 * **AMD**: `amdgpu` (modern) and `radeonkms` (legacy)
 * **NVIDIA**: auto classifies to a supported branch (e.g., `nvidia-driver-580/470/390/340/304`)
-* **PCI detection**: considers devices with the `VGA` or `3D` subclass
 * **Generic**: `vesa`, `scfb` (syscons framebuffer)
 
 ### Virtualization
@@ -53,11 +52,6 @@ cd xconfig
 # Install the script
 sudo install -m 755 bin/xconfig /usr/local/bin/xconfig
 
-# Install and enable the boot-time configuration service
-sudo install -d -m 755 /usr/local/etc/rc.d
-sudo install -m 555 rc.d/xconfig /usr/local/etc/rc.d/xconfig
-sudo sysrc xconfig_enable="YES"
-
 # Install external config templates (system-wide)
 sudo mkdir -p /usr/local/etc/X11/cardDetect
 sudo cp -r cardDetect/* /usr/local/etc/X11/cardDetect/
@@ -76,36 +70,6 @@ sudo xconfig auto
 ```
 
 Detects hardware and applies the best configuration (including NVIDIA/AMD/Intel and hypervisors).
-
-### Hybrid and multi-GPU systems
-
-Automatic detection uses PCI presence and keeps the existing Intel, AMD, then
-NVIDIA preference order. PCI presence does not identify which GPU drives the
-active display, so this order may not match the display path on hybrid laptops.
-
-Set `xconfig_gpu` to choose which GPU driver stack
-`xconfig auto` configures:
-
-* `auto` (default): use the existing automatic preference order.
-* `intel`: configure the Intel DRM driver (`i915kms`).
-* `amd`: configure `amdgpu` or `radeonkms` based on the detected AMD device.
-* `nvidia`: detect the NVIDIA driver branch and configure its driver stack.
-
-This is a driver-setup preference, not an Xorg device-binding or display-routing
-setting. It does not guarantee which GPU Xorg will use or which GPU physically
-drives the display; Xorg's device probing and the system's display wiring or
-firmware still determine the active display path.
-
-Values are case-sensitive and must be lowercase. Set
-`xconfig_gpu="nvidia"` in `/etc/rc.conf` or `/etc/rc.conf.d/xconfig` to
-persist the preference across boots. The `rc.d/xconfig` service runs
-`xconfig auto` during boot, so this setting applies the requested driver setup
-at boot. For a one-time test, use
-`sudo env XCONFIG_GPU=nvidia xconfig auto`; the environment variable takes
-precedence over the configured value.
-
-The preference applies only to physical GPUs. Hypervisor detection takes
-precedence and logs a warning when a non-`auto` preference is ignored.
 
 ### Interactive setup
 
